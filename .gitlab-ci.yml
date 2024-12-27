@@ -1,0 +1,49 @@
+#stages:
+#  - test
+#
+#run_tests:
+#  stage: test
+#  script:
+#    - echo "Hello, World!"
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push"'
+      when: never
+    - if: '$CI_PIPELINE_SOURCE == "trigger"'  # Добавлено правило для триггера
+      when: always
+    - when: always
+
+stages:
+  - test
+
+run_tests:
+  stage: test
+  before_script:
+    - echo "Creating virtual environment..."
+    - python -m venv venv
+    - echo "activate venv"
+    - .\venv\Scripts\activate
+    - echo "Installing dependencies..."
+    - pip install -r requirements.txt
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'  # Выполнять только для ветки develop
+      when: always  # Автоматический запуск для ветки develop
+    - if: '$CI_COMMIT_BRANCH == "main"'     # Не выполнять для ветки main
+      when: never  # Не выполнять это задание
+  when: manual  # Задание должно запускаться вручную, если не сработали другие условия
+  script:
+    - echo "Trying to clone from remote repository..."
+#    - |
+#      timeout 30 git clone git@gitlab.npobaum.ru:ivanov/at_rest_api_uds.git || {
+#        echo "Failed to clone from remote repository. Using local repository instead."
+#        # путь к локальному репозиторию
+#        cp -r C:\Users\User\Projects\PythonProjects\Baum\UDS\* C:\Users\User\GitLab-Runner\builds\iFTLzxysE\0\ivanov\at_rest_api_uds\
+#      }
+    - echo "activate venv"
+    - .\venv\Scripts\activate
+    - echo "Running tests..."
+#    - python -m pytest --testit tests\api\tests\pools\test_create_pools_positive.py::TestPools::test_create_pool_manual_raid1
+#    - python -m pytest --testit tests\api\tests\pools\ --tmsTestRunId=${TEST_RUN_ID} --tmsAdapterMode=ADAPTER_MODE
+    - python -m pytest -log-cli-level=DEBUG -s --testit tests\api\tests\pools\

@@ -1,0 +1,16 @@
+/.vscode
+/.idea
+/.pytest_cache
+**/__pycache__/
+/venv
+**/allure-results
+/auth_data.json
+/pashalka.py
+/text.txt
+/tests/ui
+/tests/api/tests/poolx
+/docs/build
+playwright.config.ts
+texput.log
+/tests/api/tests/disks
+/tests/context.py
