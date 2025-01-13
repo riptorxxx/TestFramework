@@ -4,6 +4,7 @@ from framework.logger import logger
 import time
 import json
 from urllib.parse import urlencode
+from framework.cookie_manager import CookieManager
 
 
 """ Этот модуль предоставляет функциональность для выполнения HTTP-запросов (GET, POST, PUT, DELETE)
@@ -72,26 +73,30 @@ def handle_http(method, url, json=None, headers=None, params=None, cookies=None,
     :raises httpx.HTTPStatusError: Если статус ответа указывает на ошибку.
             Exception: Для других неожиданных ошибок.
     """
-    start_time = time.time()  # Время начала запроса
+    start_time = time.time()
 
     # Вывод в логи всех запросов в виде CURL
     curl_command = request_to_curl(method, url, headers, params, json, cookies)
     logger.info(f"Equivalent CURL command:\n{curl_command}")
 
     try:
-        with httpx.Client(timeout=timeout, cookies=cookies) as client:
+        with httpx.Client(timeout=timeout) as client:
+            # Set cookies for the client session
+            if cookies:
+                client.cookies.update(cookies)
+
             if method == 'GET':
-                response = client.get(url, headers=headers, params=params)
+                response = client.get(url, headers=headers, params=params, cookies=cookies)
             elif method == 'POST':
-                response = client.post(url, json=json, headers=headers)
+                response = client.post(url, json=json, headers=headers, cookies=cookies)
             elif method == 'PUT':
-                response = client.put(url, json=json, headers=headers)
+                response = client.put(url, json=json, headers=headers, cookies=cookies)
             elif method == 'DELETE':
-                response = client.delete(url, headers=headers)
+                response = client.delete(url, headers=headers, cookies=cookies)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
-            elapsed_time = time.time() - start_time  # Время завершения запроса
+            elapsed_time = time.time() - start_time
             logger.info(f"{method} {url} completed with status {response.status_code} in {elapsed_time:.2f} seconds")
             return response
 
@@ -101,6 +106,7 @@ def handle_http(method, url, json=None, headers=None, params=None, cookies=None,
     except Exception as exc:
         logger.error(f"Unexpected error in {method}: {str(exc)}")
         raise
+
 
 
 class APIClient:
@@ -113,23 +119,32 @@ class APIClient:
         """
 
         self.base_url = base_url
-        self.cookies = {}  # Хранение куки
+        self.cookie_manager = CookieManager()
 
 
-    def parse_cookies(self, set_cookie_header):
-        """
-        Парсит заголовок Set-Cookie и возвращает словарь с куками.
+    def update_cookies(self, response):
+        """Update cookies from response"""
+        if 'Set-Cookie' in response.headers:
+            new_cookies = self.cookie_manager.parse_set_cookie_header(
+                response.headers.get_list('Set-Cookie')
+            )
+            self.cookies.update(new_cookies)
 
-        :param set_cookie_header: (str): Заголовок Set-Cookie из ответа.
-        :return: dict: Словарь с куками.
-        """
 
-        cookies = {}
-        for cookie in set_cookie_header.split(','):
-            key_value = cookie.split(';')[0].strip().split('=')
-            if len(key_value) == 2:
-                cookies[key_value[0]] = key_value[1]
-        return cookies
+    # def parse_cookies(self, set_cookie_header):
+    #     """
+    #     Парсит заголовок Set-Cookie и возвращает словарь с куками.
+    #
+    #     :param set_cookie_header: (str): Заголовок Set-Cookie из ответа.
+    #     :return: dict: Словарь с куками.
+    #     """
+    #
+    #     cookies = {}
+    #     for cookie in set_cookie_header.split(','):
+    #         key_value = cookie.split(';')[0].strip().split('=')
+    #         if len(key_value) == 2:
+    #             cookies[key_value[0]] = key_value[1]
+    #     return cookies
 
 
     @allure.step("Sending GET request to {endpoint}")
@@ -144,30 +159,38 @@ class APIClient:
         """
 
         url = f"{self.base_url}{endpoint}"
-        response = handle_http("GET", url, headers=headers, params=params, cookies=self.cookies)
+        cookies = self.cookie_manager.get_current_cookies()
+        response = handle_http("GET", url, headers=headers, params=params, cookies=cookies)
         self.log_response(response)
         # logger.info(f"GET RESPONSE:  {response.json()}")
         return response
 
-
     @allure.step("Sending POST request to {endpoint}")
-    def post(self, endpoint, json=None, headers=None):
+    def post(self, endpoint, json=None, headers=None, cookies=None):
         """
         Выполняет POST запрос к указанному эндпоинту.
 
         :param endpoint: (str): Эндпоинт для запроса.
         :param json: (dict or list): Данные JSON для отправки в теле запроса.
         :param headers: (dict or None): Заголовки для запроса.
+        :param cookies: (dict or None): Кастомные куки для запроса.
         :return: httpx.Response: Ответ от сервера.
         """
-
         url = f"{self.base_url}{endpoint}"
-        response = handle_http("POST", url, json=json, headers=headers, cookies=self.cookies)
+
+        # Merge default cookies from cookie_manager with custom cookies
+        request_cookies = {
+            **self.cookie_manager.get_current_cookies(),
+            **(cookies or {})
+        }
+        # self.log_request("POST", url, headers, None, json, request_cookies)
+        response = handle_http("POST", url, json=json, headers=headers, cookies=request_cookies)
         self.log_response(response)
 
-        # Обновляем куки при необходимости
-        if 'Set-Cookie' in response.headers:
-            self.cookies.update(self.parse_cookies(response.headers['Set-Cookie']))
+        # Update cookie_manager with new cookies from response
+        self.cookie_manager.update_from_response(response)
+        self.log_response(response)
+
         return response
 
 
@@ -221,7 +244,7 @@ class APIClient:
 
     @staticmethod
     @allure.step("Logging request")
-    def log_request(method, url, headers=None, params=None, json=None):
+    def log_request(method, url, headers=None, params=None, json=None, cookies=None):
         """
         Логирует информацию о выполненном запросе.
 
@@ -233,10 +256,18 @@ class APIClient:
         :return: None
         """
 
+        logger.info("=== Request Details ===")
         logger.info(f"{method} Request to {url}")
         if headers:
-            logger.info(f"Headers: {headers}")
+            logger.info("Headers:")
+            for header, value in headers.items():
+                logger.info(f"  {header}: {value}")
             allure.attach(str(headers), name="request_headers", attachment_type=allure.attachment_type.TEXT)
+
+        if cookies:
+            logger.info("Cookies:")
+            for cookie, value in cookies.items():
+                logger.info(f"  {cookie}: {value}")
 
         if params:
             logger.info(f"Params: {params}")
@@ -245,3 +276,5 @@ class APIClient:
         if json:
             logger.info(f"Body: {json}")
             allure.attach(str(json), name="request_body", attachment_type=allure.attachment_type.JSON)
+
+        logger.info("=====================")

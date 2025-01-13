@@ -4,29 +4,90 @@ from framework.api_client import APIClient
 import os
 from dotenv import load_dotenv
 from framework.context import TestContext
+from framework.tools.connection_tools import ConnectionTools
 
 #   Загрузка переменных окружения из .env файла. Нужно для фикстуры login.
 load_dotenv()
 
 
 @pytest.fixture(scope="session")
-def base_url(request):
+def connection_tools():
     """
-    Фикстура устанавливает base_url в зависимости от
-    пришедшего из теста параметра NODE (NODE_1, NODE_2....)
+    Фикстура создает и предоставляет инструмент для работы с нодами тестового окружения.
 
-    :param request: Объект запроса pytest.
-    :return: Значение URL из .env файла.
+    Scope="session" обеспечивает:
+    - Единый экземпляр ConnectionTools на всю сессию тестирования
+    - Однократную загрузку конфигурации нод из .env файла
+    - Кэширование списка доступных нод
+    - Оптимизацию использования ресурсов
+
+    Returns:
+        ConnectionTools: Инструмент для управления подключениями к нодам
+
+    Example:
+        def test_example(connection_tools):
+            connection_tools.configure("NODE_1")
+            config = connection_tools.get_current_config()
+            assert config.node == "NODE_1"
+    """
+    return ConnectionTools(None)
+
+
+@pytest.fixture(scope="session")
+def base_url(request, connection_tools):
+    """
+    Фикстура для управления базовым URL тестового окружения.
+
+    Работает на уровне сессии тестирования и использует ConnectionTools
+    для конфигурации URL в зависимости от выбранной ноды.
+
+    Args:
+        request: Объект pytest request для доступа к параметрам параметризации
+        connection_tools: Инструмент управления подключениями к нодам
+
+    Returns:
+        str: URL выбранной ноды из конфигурации
+
+    Example:
+        @pytest.mark.parametrize("base_url", ["NODE_1", "NODE_2"], indirect=True)
+        def test_example(base_url):
+            assert base_url.startswith('http')
     """
     if hasattr(request, 'param'):
-        node = request.param
+        connection_tools.configure(request.param)
+        return connection_tools.get_current_config().url
 
-        if node == "NODE_1":
-            return os.getenv("NODE_1")
-        elif node == "NODE_2":
-            return os.getenv("NODE_2")
-        else:
-            raise ValueError(f"Unknown NODE: {node}")
+
+@pytest.fixture
+def node_switcher(framework_context):
+    """
+    Фикстура предоставляет функцию для динамического переключения между нодами в рамках одного теста.
+
+    Создает и возвращает замыкание, которое позволяет:
+    - Переключаться между нодами в любой момент выполнения теста
+    - Автоматически обновлять base_url в клиенте
+    - Сохранять контекст подключения
+
+    Args:
+        framework_context: Контекст тестового фреймворка
+
+    Returns:
+        Callable[[str], None]: Функция switch_to для переключения на указанную ноду
+
+    Example:
+        def test_cross_node(node_switcher):
+            node_switcher("NODE_1")
+            # выполняем действия на NODE_1
+            node_switcher("NODE_2")
+            # выполняем действия на NODE_2
+    """
+    connection_tool = framework_context.tools_manager.connection
+
+    def switch_to(node: str):
+        connection_tool.configure(node)
+        framework_context.client.base_url = os.getenv(node)
+
+    return switch_to
 
 
 @pytest.fixture(scope="function")
@@ -43,139 +104,6 @@ def client(base_url):
     """
     return APIClient(base_url)
 
-
-#   Фикстура для установки заголовков, query параметров и других атрибутов
-@pytest.fixture(scope="function")
-def request_params(login):
-    """
-    Фикстура `request_params` создает словарь с заголовками и параметрами запроса,
-    которые могут быть использованы в тестах для выполнения HTTP-запросов.
-    Эта фикстура зависит от фикстуры `login`, которая должна возвращать объект
-    с куками (cookies) после успешной аутентификации.
-
-    :param login: Фикстура, возвращающая ответ и куки после аутентификации.
-                  Ожидается, что `login` возвращает кортеж из двух элементов:
-                  1. response: объект ответа (например, HTTPResponse).
-                  2. cookies: словарь с куками, полученными из ответа.
-
-    :return: Словарь с заголовками и параметрами запроса:
-    """
-    # Извлекаем куки из фикстуры login
-    response, cookies = login
-
-    return {
-        "headers": {
-            # "Authorization": "Bearer some_token",
-            "Content-Type": "application/json",
-            "Cookie": "; ".join([f"{k}={v}" for k, v in cookies.items()])  # Добавляем куки
-        },
-        "params": {
-            # "search": "test"  # Пример query параметра
-        }
-    }
-
-#
-# @pytest.fixture(scope="function")
-# def login(client, base_url, request):
-#     """
-#     Фикстура для авторизации пользователя.
-#
-#     Эта фикстура выполняет авторизацию на сервере, используя переданные параметры
-#     (username и password). Если параметры не переданы из теста, используются значения
-#     по умолчанию из .env файла.
-#
-#     :param client: Экземпляр клиента для выполнения HTTP-запросов.
-#     :param base_url: Базовый URL сервера.
-#     :param request: Объект запроса, который содержит параметры теста.
-#     :return: Кортеж (response, cookies), где:
-#              - response: Объект ответа от сервера после попытки авторизации.
-#              - cookies: Словарь с куками, полученными из заголовка 'Set-Cookie'.
-#
-#     :raises AssertionError: Если статус-код ответа не равен 200.
-#     """
-#     # Получаем параметры username и password из request.param
-#     params = request.param if hasattr(request, 'param') else {}
-#
-#     username = params.get("username") if isinstance(params, dict) else None
-#     password = params.get("password") if isinstance(params, dict) else None
-#
-#     # Проверяем наличие параметров
-#     if username is None and password is None:
-#         # Используем значения из .env файла
-#         username = os.getenv("NODE_USERNAME")
-#         password = os.getenv("NODE_PASSWORD")
-#
-#     # Формируем запрос
-#     endpoint = "/login"
-#     data = {
-#         "login": username,
-#         "password": password,
-#         "remember": True
-#     }
-#
-#     with allure.step(f"Выполняем авторизацию на {base_url}{endpoint}"):
-#         response = client.post(endpoint, json=data)
-#         # logger.info(f"Получено тело ответа: {response.json()}")
-#
-#     assert response.status_code == 200, f"Unexpected status code: {response.status_code}"
-#
-#     with allure.step(f"Извлекаем куки"):
-#         cookies = {}
-#         if 'Set-Cookie' in response.headers:
-#             cookies.update(client.parse_cookies(response.headers['Set-Cookie']))
-#         # logger.info(f"Получили куки: {response.headers.get('Set-Cookie')}")
-#
-#     return response, cookies
-#
-#
-# # Фикстура для выхода из системы
-# @pytest.fixture(scope="function")
-# def logout(client, base_url, login):
-#     """
-#     Функция для выхода пользователя из системы.
-#
-#     Эта функция выполняет выход пользователя, используя данные, полученные при авторизации.
-#     Она формирует запрос на выход и отправляет его на сервер.
-#
-#     :param client: Экземпляр клиента для выполнения HTTP-запросов.
-#     :param base_url: Базовый URL сервера.
-#     :param login: Кортеж, содержащий ответ и куки из фикстуры авторизации.
-#                   Ожидается, что кортеж содержит:
-#                   - response: Объект ответа от сервера после авторизации.
-#                   - cookies: Словарь с куками, полученными из заголовка 'Set-Cookie'.
-#
-#     :return: Объект ответа от сервера после выполнения запроса на выход.
-#     :raises AssertionError: Если статус-код ответа не равен 204 (No Content).
-#     """
-#     response, cookies = login  # Получаем ответ и куки из фикстуры login
-#     yield
-#     with allure.step(f"Парсим ответ полученный при авторизации"):
-#         response_data = response.json()
-#         sid = response_data['sid']
-#         user = response_data['data']['login']
-#         role = response_data['data']['role']
-#         # logger.info(f"Результат парсинга (Данные авторизованного пользователя): \n sid={sid} user={user} role={role}")
-#
-#     #   Формируем запрос
-#     with allure.step(f"Формируем запрос"):
-#         endpoint = "/logout"
-#         headers = {
-#             "Cookie": f"jwt_access={cookies.get('jwt_access')}"
-#         }
-#         data = {
-#             "sid": sid,
-#             "login": user,
-#             "role": role
-#         }
-#
-#     #   Отправляем запрос
-#     #     logger.info(f"Отправляем данные для выхода: {data}")
-#     with allure.step(f"Отправляем запрос на {base_url} {endpoint}"):
-#         response = client.post(endpoint, json=data, headers=headers)
-#         assert response.status_code == 204, f"Unexpected status code: {response.status_code}"
-#
-#         return response
-#
 
 @pytest.fixture(scope="function")
 def cluster_info(client, base_url):
@@ -217,14 +145,14 @@ def authenticated_context(test_context):
 
 
 @pytest.fixture
-def framework_context(client, base_url, cluster_info, keys_to_extract):
+def framework_context(client, base_url):
     """Create framework context for tests"""
     return TestContext(
         client=client,
         base_url=base_url,
         # request_params=request_params,
-        cluster_info=cluster_info,
-        keys_to_extract=keys_to_extract
+        # cluster_info=cluster_info,
+        # keys_to_extract=keys_to_extract
     )
 
 

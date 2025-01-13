@@ -4,6 +4,7 @@ from framework.tools.pool_tools import PoolTools
 from framework.tools.disk_tools import DiskTools
 from framework.tools.cluster_tools import ClusterTools
 from framework.tools.auth_tools import AuthTools
+from framework.tools.connection_tools import ConnectionTools
 
 
 class ToolsManager:
@@ -19,6 +20,7 @@ class ToolsManager:
         self.register_tool('disk', DiskTools)
         self.register_tool('cluster', ClusterTools)
         self.register_tool('auth', AuthTools)
+        self.register_tool('connection', ConnectionTools)
 
     def register_tool(self, name: str, tool_class: Type[BaseTools]):
         self._tools[name] = tool_class(self._context)
@@ -43,3 +45,7 @@ class ToolsManager:
     @property
     def auth(self) -> AuthTools:
         return self.get_tool('auth')
+
+    @property
+    def connection(self) -> ConnectionTools:
+        return self.get_tool('connection')
