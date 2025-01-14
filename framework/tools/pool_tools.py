@@ -1,10 +1,10 @@
 from framework.tools.base_tools import BaseTools
-from framework.pool.config import PoolConfig
+from framework.configs.pool_config import PoolConfig
 from framework.helpers.retry import disk_operation_with_retry
 
 
 class PoolTools(BaseTools):
-    """Tools for pool operations"""
+    """Tools for pools operations"""
 
     def __init__(self, context):
         super().__init__(context)
@@ -15,7 +15,7 @@ class PoolTools(BaseTools):
 
     @disk_operation_with_retry()
     def create_pool(self, pool_config: PoolConfig):
-        """Create pool with configuration"""
+        """Create pools with configuration"""
         self.validate()
         selected_disks = self._context.tools_manager.disk.select_disks_for_pool(pool_config)
         pool_config.update_disks(selected_disks)

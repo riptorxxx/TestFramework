@@ -1,5 +1,4 @@
-from typing import Optional
-from framework.tools_manager import ToolsManager
+from framework.core.tools_manager import ToolsManager
 
 
 class TestContext:

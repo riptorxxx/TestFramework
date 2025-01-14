@@ -47,7 +47,7 @@ class PoolConfig:
         """Обрезает неиспользуемые параметры в отчёте TestIT"""
         return str(self.to_request_data())
 
-    # Common pool parameters
+    # Common pools parameters
     name: str = None
     node: int = None
     raid_type: str = "raid1"

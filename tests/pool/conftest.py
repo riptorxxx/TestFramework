@@ -1,9 +1,7 @@
 import pytest
 import testit
-import os
-from framework import logger
-from tests.api.tests.pools.pools_helpers import PoolsHelper, PoolConfig
-
+from framework.core import logger
+from tests.api.tests.pools.pools_helpers import PoolsHelper
 
 
 @pytest.fixture(autouse=True)

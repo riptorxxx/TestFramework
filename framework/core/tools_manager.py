@@ -16,7 +16,7 @@ class ToolsManager:
         self._register_default_tools()
 
     def _register_default_tools(self):
-        self.register_tool('pool', PoolTools)
+        self.register_tool('pools', PoolTools)
         self.register_tool('disk', DiskTools)
         self.register_tool('cluster', ClusterTools)
         self.register_tool('auth', AuthTools)
@@ -32,7 +32,7 @@ class ToolsManager:
 
     @property
     def pool(self) -> PoolTools:
-        return self.get_tool('pool')
+        return self.get_tool('pools')
 
     @property
     def disk(self) -> DiskTools:

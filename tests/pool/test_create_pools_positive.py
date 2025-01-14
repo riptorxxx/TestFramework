@@ -1,8 +1,8 @@
 import pytest
 import testit
 from tests.api.tests.pools.pools_helpers import PoolsHelper
-from framework.pool.config import PoolConfig
-from tests.api.helpers.error_handler import TestErrorHandler
+from framework.configs.pool_config import PoolConfig
+from framework.core.error_handler import TestErrorHandler
 
 
 

@@ -1,4 +1,4 @@
-from framework.logger import logger
+from framework.core.logger import logger
 import time
 import functools
 

@@ -1,18 +1,12 @@
+import os
+import time
 from threading import Thread, Event
 from typing import Dict, Optional, Tuple
-from dataclasses import dataclass
-import os
+from ..configs.auth_config import AuthConfig
 from ..tools.base_tools import BaseTools
-from framework.cookie_manager import CookieManager
-from ..logger import logger
-import time
+from framework.core.cookie_manager import CookieManager
+from framework.core.logger import logger
 
-
-@dataclass
-class AuthConfig:
-    username: str
-    password: str
-    remember: bool = True
 
 
 class TokenRefresher(Thread):
@@ -65,24 +59,71 @@ class AuthTools(BaseTools):
             self.logger.error(f"Auth validation failed: {e}")
             return False
 
+    def configure(self, **kwargs) -> 'AuthTools':
+        """
+        Configure authentication parameters
 
-    def configure(self,
-                 username: str = None,
-                 password: str = None,
-                 remember: bool = True) -> 'AuthTools':
-        """Configure authentication parameters"""
-        username = username or os.getenv("NODE_USERNAME")
-        password = password or os.getenv("NODE_PASSWORD")
-
-        if not all([username, password]):
-            raise ValueError("Missing required authentication parameters")
-
-        self._config = AuthConfig(
-            username=username,
-            password=password,
-            remember=remember
-        )
+        Allows any parameters to be passed or omitted for testing different request bodies
+        """
+        if not kwargs:
+            # Use default values for empty configure() call
+            kwargs = {
+                'username': 'admin',
+                'password': '123456',
+                'remember': True
+            }
+        self._config = AuthConfig(**kwargs)
         return self
+
+
+    # def configure(self,
+    #               username: str = None,
+    #               password: str = None,
+    #               remember: bool = True,
+    #               skip_validation: bool = False) -> 'AuthTools':
+    #     """
+    #     Configure authentication parameters
+    #
+    #     Args:
+    #         username: Login for authentication
+    #         password: Password for authentication
+    #         remember: Remember session flag
+    #         skip_validation: Skip parameters validation for negative testing
+    #     """
+    #     # Явно переданные значения имеют приоритет
+    #     # None тоже считается явно переданным значением
+    #     self._username = username if username is not None else os.getenv("NODE_USERNAME")
+    #     self._password = password if password is not None else os.getenv("NODE_PASSWORD")
+    #
+    #     # Валидация только для позитивных сценариев
+    #     if not skip_validation and not all([self._username, self._password]):
+    #         raise ValueError("Missing required authentication parameters")
+    #
+    #     self._config = AuthConfig(
+    #         username=self._username,
+    #         password=self._password,
+    #         remember=remember
+    #     )
+    #     return self
+
+
+    # def configure(self,
+    #              username: str = None,
+    #              password: str = None,
+    #              remember: bool = True) -> 'AuthTools':
+    #     """Configure authentication parameters"""
+    #     username = username or os.getenv("NODE_USERNAME")
+    #     password = password or os.getenv("NODE_PASSWORD")
+    #
+    #     if not all([username, password]):
+    #         raise ValueError("Missing required authentication parameters")
+    #
+    #     self._config = AuthConfig(
+    #         username=username,
+    #         password=password,
+    #         remember=remember
+    #     )
+    #     return self
 
     def _parse_auth_response(self, response) -> Tuple[Dict, Dict, Dict]:
         """Управляет парсерами для поддержания сессии"""
@@ -139,40 +180,63 @@ class AuthTools(BaseTools):
 
     def _perform_login(self):
         if not self._config:
-            raise ValueError("Authentication not configured. Call configure() first.")
-
-        client = self._context.client
-        login_data = {
-            "login": self._config.username,
-            "password": self._config.password,
-            "remember": self._config.remember
-        }
+            raise ValueError("Authentication not configured")
 
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
         self._user_agent = headers['User-Agent']
 
-        response = client.post("/login", json=login_data, headers=headers)
-
-        # Detailed logging of response
-        # self.logger.info("=== Login Response Details ===")
-        # self.logger.info(f"Status Code: {response.status_code}")
-        # self.logger.info("Headers:")
-        # for header, value in response.headers.items():
-        #     self.logger.info(f"{header}: {value}")
-        # self.logger.info("Response Body:")
-        # self.logger.info(response.json())
-        # self.logger.info("Cookies:")
-        # self.logger.info(dict(response.cookies))
-        # self.logger.info("========================")
+        response = self._context.client.post(
+            "/login",
+            json=self._config.to_request(),
+            headers=headers
+        )
 
         if response.status_code != 200:
-            raise ConnectionError(f"Login failed: {response.text}")
+            raise ConnectionError(f"Login failed: {response.text}") # Исправить - это не правильная ошибка
+
         self._session_data, self._auth_headers, self._cookies = self._parse_auth_response(response)
-        # logger.info(f"Session data after login: {self._session_data}")
-        self._last_refresh_time = time.time()  # Set initial refresh time
+        self._last_refresh_time = time.time()
         return response
+
+
+    # def _perform_login(self):
+    #     if not self._config:
+    #         raise ValueError("Authentication not configured. Call configure() first.")
+    #
+    #     client = self._context.client
+    #     login_data = {
+    #         "login": self._config.username,
+    #         "password": self._config.password,
+    #         "remember": self._config.remember
+    #     }
+    #
+    #     headers = {
+    #         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    #     }
+    #     self._user_agent = headers['User-Agent']
+    #
+    #     response = client.post("/login", json=login_data, headers=headers)
+    #
+    #     # Detailed logging of response
+    #     # self.logger.info("=== Login Response Details ===")
+    #     # self.logger.info(f"Status Code: {response.status_code}")
+    #     # self.logger.info("Headers:")
+    #     # for header, value in response.headers.items():
+    #     #     self.logger.info(f"{header}: {value}")
+    #     # self.logger.info("Response Body:")
+    #     # self.logger.info(response.json())
+    #     # self.logger.info("Cookies:")
+    #     # self.logger.info(dict(response.cookies))
+    #     # self.logger.info("========================")
+    #
+    #     if response.status_code != 200:
+    #         raise ConnectionError(f"Login failed: {response.text}")
+    #     self._session_data, self._auth_headers, self._cookies = self._parse_auth_response(response)
+    #     # logger.info(f"Session data after login: {self._session_data}")
+    #     self._last_refresh_time = time.time()  # Set initial refresh time
+    #     return response
 
 
     def needs_token_refresh(self) -> bool:

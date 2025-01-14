@@ -1,10 +1,10 @@
 import httpx
 import allure
-from framework.logger import logger
+from framework.core.logger import logger
 import time
 import json
 from urllib.parse import urlencode
-from framework.cookie_manager import CookieManager
+from framework.core.cookie_manager import CookieManager
 
 
 """ Этот модуль предоставляет функциональность для выполнения HTTP-запросов (GET, POST, PUT, DELETE)

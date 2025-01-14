@@ -15,7 +15,7 @@ class DiskTools(BaseTools):
 
     @disk_operation_with_retry()
     def select_disks_for_pool(self, pool_config):
-        """Select disks for pool creation"""
+        """Select disks for pools creation"""
         self.validate()
         cluster_info = self._context.tools_manager.cluster.get_cluster_info()
         return self.disk_selector.select_disks(cluster_info, pool_config)

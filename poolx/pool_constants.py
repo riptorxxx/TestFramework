@@ -1,4 +1,4 @@
-"""Constants for pool operations"""
+"""Constants for pools operations"""
 
 # Disk requirements
 MIN_MAIN_DISKS = 2

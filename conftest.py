@@ -1,9 +1,9 @@
 import pytest
 import allure
-from framework.api_client import APIClient
+from framework.core.api_client import APIClient
 import os
 from dotenv import load_dotenv
-from framework.context import TestContext
+from framework.core.context import TestContext
 from framework.tools.connection_tools import ConnectionTools
 
 #   Загрузка переменных окружения из .env файла. Нужно для фикстуры login.

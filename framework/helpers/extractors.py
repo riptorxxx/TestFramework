@@ -1,4 +1,4 @@
-from framework.api_client import logger
+from framework.core.api_client import logger
 from typing import Dict, List
 
 

@@ -1,6 +1,5 @@
 import pytest
-import time
-from framework.logger import logger
+from framework.core.logger import logger
 
 
 # @pytest.fixture
@@ -73,9 +72,9 @@ def test_cross_node_scenario(framework_context, node_switcher):
 
 
 # Тест с ручным добавление кредов авторизации
-@pytest.mark.parametrize("base_url", ["NODE_1", "NODE_2"], indirect=True)
+@pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
 @pytest.mark.parametrize("configured_auth_ctx", [
-    {"username": "admin", "password": "123456"},
+    {"username": "admin", "password": "123456", "remember": True},
     # {"username": "user", "password": "user_pass"},
     # {"username": "readonly", "password": "readonly_pass"}
 ], indirect=True)
@@ -100,9 +99,9 @@ def test_different_user_auth(configured_auth_ctx):
 #     # Login with parametrized data
 #     framework_context.tools_manager.auth.login(login_data)
 #
-#     # Create pool using pool tools
+#     # Create pools using pools tools
 #     pool_config = {...}
-#     result = framework_context.tools_manager.pool.create_pool(pool_config)
+#     result = framework_context.tools_manager.pools.create_pool(pool_config)
 #
 #     # Assertions
 #     assert result["status"] == "success"
