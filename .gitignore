@@ -14,3 +14,5 @@ playwright.config.ts
 texput.log
 /tests/api/tests/disks
 /tests/context.py
+connection_config.ini
+.gitlab-ci.yml
