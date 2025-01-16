@@ -41,6 +41,7 @@ class AuthTools(BaseTools):
         self.cookie_manager = CookieManager()
         self._token_refresher: Optional[TokenRefresher] = None
         self._last_refresh_time: Optional[float] = None
+        self._skip_validation: bool = False
         self.logger = logger
 
 
@@ -52,28 +53,54 @@ class AuthTools(BaseTools):
         if not self._config:
             return False
 
+        if hasattr(self._config, '_skip_validation'):
+            return True
+
         try:
             # Check if we have valid credentials
-            return bool(self._config.username and self._config.password)
+            return bool(self._config and self._config.username and self._config.password)
         except Exception as e:
             self.logger.error(f"Auth validation failed: {e}")
             return False
 
     def configure(self, **kwargs) -> 'AuthTools':
-        """
-        Configure authentication parameters
+        """Configure authentication parameters"""
+        if kwargs:
+            self._config = AuthConfig(**kwargs)
+            self._skip_validation = True
+        else:
+            username = os.getenv('NODE_USERNAME')
+            password = os.getenv('NODE_PASSWORD')
 
-        Allows any parameters to be passed or omitted for testing different request bodies
-        """
-        if not kwargs:
-            # Use default values for empty configure() call
-            kwargs = {
-                'username': 'admin',
-                'password': '123456',
-                'remember': True
-            }
-        self._config = AuthConfig(**kwargs)
+            if username is None:
+                raise ValueError("NODE_USERNAME not found in environment variables")
+            if password is None:
+                raise ValueError("NODE_PASSWORD not found in environment variables")
+
+            self._config = AuthConfig(
+                username=username,
+                password=password,
+                remember=True
+            )
+            self._skip_validation = False
         return self
+
+
+    # def configure(self, **kwargs) -> 'AuthTools':
+    #     """
+    #     Configure authentication parameters
+    #
+    #     Allows any parameters to be passed or omitted for testing different request bodies
+    #     """
+    #     if not kwargs:
+    #         # Use default values for empty configure() call
+    #         kwargs = {
+    #             'username': 'admin',
+    #             'password': '123456',
+    #             'remember': True
+    #         }
+    #     self._config = AuthConfig(**kwargs)
+    #     return self
 
 
     # def configure(self,
@@ -166,6 +193,8 @@ class AuthTools(BaseTools):
 
     def login(self):
         """Perform login and start token refresh mechanism"""
+        if not self._skip_validation and not self.validate():
+            raise ValueError("Invalid authentication configuration")
         response = self._perform_login()
 
         # Update cookie manager with login response

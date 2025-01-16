@@ -2,15 +2,6 @@ import pytest
 from framework.core.logger import logger
 
 
-# @pytest.fixture
-# def configured_auth(framework_context, credentials):
-#     """Fixture configures auth with specific credentials"""
-#     framework_context.tools_manager.auth.configure(
-#         username=credentials["username"],
-#         password=credentials["password"]
-#     )
-#     return framework_context
-
 @pytest.fixture
 def configured_auth_ctx(framework_context, request):
     """Fixture configures auth with credentials from params or env"""
