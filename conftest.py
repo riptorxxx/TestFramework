@@ -145,14 +145,14 @@ def authenticated_context(test_context):
 
 
 @pytest.fixture
-def framework_context(client, base_url):
+def framework_context(client, base_url, cluster_info, keys_to_extract):
     """Create framework context for tests"""
     return TestContext(
         client=client,
         base_url=base_url,
         # request_params=request_params,
-        # cluster_info=cluster_info,
-        # keys_to_extract=keys_to_extract
+        cluster_info=cluster_info,
+        keys_to_extract=keys_to_extract
     )
 
 

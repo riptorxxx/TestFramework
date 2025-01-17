@@ -1,4 +1,4 @@
-from tests.api.tests.disks.disk_selection_strategy import (DiskSelectionStrategy,
+from framework.resources.pools.disk_selection_strategies import (DiskSelectionStrategy,
                                                            AutoConfigureStrategy,
                                                            ManualSelectionStrategy)
 

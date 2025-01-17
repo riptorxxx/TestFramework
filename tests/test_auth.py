@@ -83,22 +83,7 @@ def test_different_user_auth(configured_auth_ctx):
 
 
 
-# @pytest.mark.parametrize("login_data", [
-#     {"username": "admin", "password": "admin_pass"},
-# ])
-# def test_pool_creation(framework_context, login_data):
-#     # Login with parametrized data
-#     framework_context.tools_manager.auth.login(login_data)
-#
-#     # Create pools using pools tools
-#     pool_config = {...}
-#     result = framework_context.tools_manager.pools.create_pool(pool_config)
-#
-#     # Assertions
-#     assert result["status"] == "success"
-#
-#     # Cleanup
-#     framework_context.tools_manager.auth.logout()
+
 
 
 #
