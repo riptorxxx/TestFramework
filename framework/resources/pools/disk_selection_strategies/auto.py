@@ -1,6 +1,6 @@
 from typing import List, Dict
 from .base import DiskSelectionStrategy
-from framework.configs.pool_config import PoolConfig
+from framework.models.pool_models import PoolConfig
 
 class AutoConfigureStrategy(DiskSelectionStrategy):
     """Strategy for automatic disk selection"""

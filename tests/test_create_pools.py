@@ -1,5 +1,57 @@
 import pytest
-from framework.configs.pool_config import PoolConfig
+from framework.models.pool_models import PoolConfig
+from framework.models.disk_models import DiskType, DiskSelection
+
+
+@pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
+@pytest.mark.parametrize("keys_to_extract", [["name"]])
+@pytest.mark.parametrize("pool_config", [
+    PoolConfig(
+        name="test_raid1",
+        raid_type="raid1",
+        main_disks_count=2,
+        main_disks_type="HDD",
+        wr_cache_disk_count=1,
+        wrc_disk_type="SSD"
+    ),
+    PoolConfig(
+        name="test_raid6",
+        raid_type="raid6",
+        main_disks_count=4,
+        main_disks_type="HDD",
+        wr_cache_disk_count=2,
+        wrc_disk_type="SSD",
+        rd_cache_disk_count=2,
+        rdc_disk_type="SSD",
+        spare_cache_disk_count=2,
+        spare_disk_type="HDD"
+    )
+])
+def test_create_pool_with_disk_selection(framework_context, pool_config):
+    # Get cluster data
+    cluster_data = framework_context.cluster.get_cluster_info()
+
+    # Select disks using our selector
+    selected_disks = framework_context.cluster.disk_selector.select_disks(cluster_data, pool_config)
+
+    # Create pool
+    pool = framework_context.cluster.create_pool(
+        name=pool_config.name,
+        raid_type=pool_config.raid_type,
+        main_disks=selected_disks.main_disks,
+        wrc_disks=selected_disks.wrc_disks,
+        rdc_disks=selected_disks.rdc_disks,
+        spare_disks=selected_disks.spare_disks
+    )
+
+    # Verify pool creation
+    assert pool.status == "healthy"
+    assert len(pool.main_disks) == pool_config.main_disks_count
+    if pool_config.wr_cache_disk_count:
+        assert len(pool.wrc_disks) == pool_config.wr_cache_disk_count
+
+
+
 
 
 def test_create_minimal_pool(test_context):

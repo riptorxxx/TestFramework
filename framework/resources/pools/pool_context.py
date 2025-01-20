@@ -1,6 +1,6 @@
 from typing import Tuple
 from framework.core.context import TestContext  # Переименовали из FrameworkContext
-from framework.configs.pool_config import PoolConfig
+from framework.models.pool_models import PoolConfig
 from framework.resources.disks.disk_selector import DiskSelector
 
 class BasePoolContext:

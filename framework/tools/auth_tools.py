@@ -2,7 +2,7 @@ import os
 import time
 from threading import Thread, Event
 from typing import Dict, Optional, Tuple
-from ..configs.auth_config import AuthConfig
+from ..models.auth_models import AuthConfig
 from ..tools.base_tools import BaseTools
 from framework.core.cookie_manager import CookieManager
 from framework.core.logger import logger

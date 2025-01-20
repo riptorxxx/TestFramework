@@ -1,6 +1,6 @@
 from dataclasses import dataclass, asdict
 from typing import Optional, Union, List
-from .base_config import BaseConfig
+from .base_models import BaseConfig
 
 @dataclass
 class PoolConfig(BaseConfig):

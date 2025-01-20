@@ -106,34 +106,6 @@ def client(base_url):
 
 
 @pytest.fixture(scope="function")
-def cluster_info(client, base_url):
-    """
-    Фикстура для получения информации о кластере.
-
-    Эта фикстура выполняет HTTP GET запрос к эндпоинту '/nodes/clusterInfo',
-    чтобы получить информацию о текущем состоянии кластера. Данные из ответа
-    будут использоваться в тестах для обращения к конкретным объектам через
-    параметризацию.
-
-    :param client: API клиент, используемый для выполнения запросов.
-    :param base_url: Базовый URL для API.
-    :return: dict: Словарь с информацией о кластере или None в случае ошибки.
-    :raises AssertionError: Если статус код ответа не равен 200 или если ответ пустой.
-    """
-    with allure.step("Получаем данные о кластере."):
-        endpoint = "/nodes/clusterInfo"
-
-        response = client.get(endpoint)
-        assert response.status_code == 200, f"Unexpected status code: {response.status_code}"
-
-        response_dict = response.json()
-        assert response_dict is not None and len(response_dict) > 0, f"Response is empty: {response_dict}."
-        # logger.info(f"Информация о кластере успешно получена: {response_dict}")
-
-        return response_dict
-
-
-@pytest.fixture(scope="function")
 def authenticated_context(test_context):
     connection = test_context.tools_manager.connection
     connection.configure()
@@ -145,14 +117,14 @@ def authenticated_context(test_context):
 
 
 @pytest.fixture
-def framework_context(client, base_url, cluster_info, keys_to_extract):
-    """Create framework context for tests"""
+def framework_context(client, base_url):
+    """
+        Создаёт тестовый контекст. Обеспечивает точку входа
+        для всех инструментов тестирования через ToolsManager
+    """
     return TestContext(
         client=client,
         base_url=base_url,
-        # request_params=request_params,
-        cluster_info=cluster_info,
-        keys_to_extract=keys_to_extract
     )
 
 

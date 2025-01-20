@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional
 from .base_tools import BaseTools
-from ..configs.pool_config import PoolConfig
+from ..models.pool_models import PoolConfig
 from ..helpers.retry import disk_operation_with_retry
 from ..resources.disks.disk_selector import DiskSelector
 

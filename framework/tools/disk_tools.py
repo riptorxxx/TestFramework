@@ -1,5 +1,5 @@
 from framework.tools.base_tools import BaseTools
-from framework.disks.selector import DiskSelector
+from framework.resources.disks.disk_selector import DiskSelector
 from framework.helpers.retry import disk_operation_with_retry
 
 
