@@ -90,7 +90,7 @@ def node_switcher(framework_context):
     return switch_to
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture(scope="session")
 def client(base_url):
     """
     Фикстура для инициализации APIClient с правильным base_url
@@ -115,17 +115,42 @@ def authenticated_context(test_context):
 
     connection.logout()
 
+# Строчка для распаралеливания тестов. Копирует контекст независимый от другого.
+# context = copy.deepcopy(base_framework_context)
 
-@pytest.fixture
-def framework_context(client, base_url):
-    """
-        Создаёт тестовый контекст. Обеспечивает точку входа
-        для всех инструментов тестирования через ToolsManager
-    """
-    return TestContext(
-        client=client,
-        base_url=base_url,
-    )
+@pytest.fixture(scope="session")
+def base_framework_context(client, base_url, request):
+    """Base context without auth"""
+    context = TestContext(client=client, base_url=base_url, request=request)
+
+    yield context
+
+    # Logout only after all tests complete
+    if context.tools_manager.auth.is_authenticated:
+        context.tools_manager.auth.logout()
+
+
+@pytest.fixture(scope="function")
+def framework_context(base_framework_context, request):
+    """Pass request object to maintain test parameters"""
+    base_framework_context.request = request
+    if not base_framework_context.tools_manager.auth.is_authenticated():
+        base_framework_context.tools_manager.auth.configure()
+        base_framework_context.tools_manager.auth.login()
+
+    return base_framework_context
+
+# @pytest.fixture
+# def framework_context(client, base_url, request):
+#     """
+#         Создаёт тестовый контекст. Обеспечивает точку входа
+#         для всех инструментов тестирования через ToolsManager
+#     """
+#     return TestContext(
+#         client=client,
+#         base_url=base_url,
+#         request=request
+#     )
 
 
 

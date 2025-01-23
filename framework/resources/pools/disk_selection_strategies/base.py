@@ -8,15 +8,20 @@ class DiskSelectionStrategy(ABC):
     """Base strategy for disk selection"""
 
     @abstractmethod
-    def select_disks(self, cluster_info: ClusterDisks, pool_config: PoolConfig) -> DiskSelection:
-        """
-        Select disks according to strategy
+    def select_disks(self, free_disks: list, disks_info: dict, pool_config) -> dict:
 
-        Args:
-            cluster_info: Structured cluster information with available disks
-            pool_config: Pool configuration
-
-        Returns:
-            DiskSelection: Selected disks grouped by their roles
-        """
         pass
+
+    # @abstractmethod
+    # def select_disks(self, cluster_info: ClusterDisks, pool_config: PoolConfig) -> DiskSelection:
+    #     """
+    #     Select disks according to strategy
+    #
+    #     Args:
+    #         cluster_info: Structured cluster information with available disks
+    #         pool_config: Pool configuration
+    #
+    #     Returns:
+    #         DiskSelection: Selected disks grouped by their roles
+    #     """
+    #     pass

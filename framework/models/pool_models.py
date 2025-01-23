@@ -8,56 +8,50 @@ class PoolConfig(BaseConfig):
     name: Optional[str] = None
     node: Optional[int] = None
     raid_type: str = "raid1"
-    performance_type: int = 1
+    perfomance_type: int = 1
     percentage: int = 10
     priority: int = 0
     auto_configure: bool = True
 
     # Auto mode parameters
-    main_disks_count: Optional[int] = None
-    main_groups_count: Optional[int] = None
-    main_disks_type: Optional[str] = None
-    main_disks_size: Optional[int] = None
-    wr_cache_disk_count: Optional[int] = None
-    wrc_disk_type: Optional[str] = None
-    wrc_disk_size: Optional[int] = None
-    rd_cache_disk_count: Optional[int] = None
-    rdc_disk_type: Optional[str] = None
-    rdc_disk_size: Optional[int] = None
-    spare_cache_disk_count: Optional[int] = None
-    spare_disk_type: Optional[str] = None
-    spare_disk_size: Optional[int] = None
+    mainDisksCount: Optional[int] = None
+    mainGroupsCount: Optional[int] = None
+    mainDisksType: Optional[str] = None
+    mainDisksSize: Optional[int] = None
+    wrCacheDiskCount: Optional[int] = None
+    wrcDiskType: Optional[str] = None
+    wrcDiskSize: Optional[int] = None
+    rdCacheDiskCount: Optional[int] = None
+    rdcDiskType: Optional[str] = None
+    rdcDiskSize: Optional[int] = None
+    spareCacheDiskCount: Optional[int] = None
+    spareDiskType: Optional[str] = None
+    spareDiskSize: Optional[int] = None
 
     # Manual mode parameters
-    main_disks: Optional[Union[int, List[str]]] = None
-    wrc_disks: Optional[Union[int, List[str]]] = None
-    rdc_disks: Optional[Union[int, List[str]]] = None
-    spare_disks: Optional[Union[int, List[str]]] = None
+    mainDisks: Optional[Union[int, List[str]]] = None
+    wrcDisks: Optional[Union[int, List[str]]] = None
+    rdcDisks: Optional[Union[int, List[str]]] = None
+    spareDisks: Optional[Union[int, List[str]]] = None
 
-    _api_mapping = {
-        'name': 'name',
-        'node': 'node',
-        'raid_type': 'raidType',
-        'performance_type': 'performanceType',
-        'percentage': 'percentage',
-        'priority': 'priority',
-        'auto_configure': 'autoConfig',
-        'main_disks_count': 'mainDisksCount',
-        'main_groups_count': 'mainGroupsCount',
-        'main_disks_type': 'mainDisksType',
-        'main_disks_size': 'mainDisksSize',
-        'wr_cache_disk_count': 'wrCacheDiskCount',
-        'wrc_disk_type': 'wrcDiskType',
-        'wrc_disk_size': 'wrcDiskSize',
-        'rd_cache_disk_count': 'rdCacheDiskCount',
-        'rdc_disk_type': 'rdcDiskType',
-        'rdc_disk_size': 'rdcDiskSize',
-        'spare_cache_disk_count': 'spareCacheDiskCount',
-        'spare_disk_type': 'spareDiskType',
-        'spare_disk_size': 'spareDiskSize',
-        'main_disks': 'mainDisks',
-        'wrc_disks': 'wrcDisks',
-        'rdc_disks': 'rdcDisks',
-        'spare_disks': 'spareDisks'
-    }
+
+    @classmethod
+    def create(cls, **kwargs) -> dict:
+        """Create pool configuration dictionary"""
+        return kwargs
+
+    def to_request(self) -> dict:
+        """Convert configuration to API request format"""
+        data = super().to_request()
+        if self.auto_configure:
+            # Конфиг для автовыбора дисков
+            return {k: v for k, v in data.items()
+                    # Исключаем поля
+                   if not k.startswith(('mainDisks', 'wrcDisks', 'rdcDisks', 'spareDisks'))
+                    # Берём поля оканчивающиеся на
+                   or k.endswith('Count')}
+        # Конфиг для ручного выбора дисков
+        return {k: v for k, v in data.items()
+                # Исключаем поля
+               if not k.endswith(('Count', 'Type', 'Size'))}
 

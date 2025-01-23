@@ -5,9 +5,10 @@ from framework.core.tools_manager import ToolsManager
 class TestContext:
     """Main test framework context"""
 
-    def __init__(self, client, base_url):
+    def __init__(self, client, base_url, request=None):
         self.client = client
         self.base_url = base_url
+        self.request = request  # The request object provides access to pytest markers and other test metadata needed for retry
         self.tools_manager = ToolsManager(self)
         '''Если вдруг нужно будет хранить контекст:'''
         # self.cluster_info = None

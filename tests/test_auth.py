@@ -2,14 +2,22 @@ import pytest
 from framework.core.logger import logger
 
 
-@pytest.fixture
-def configured_auth_ctx(framework_context, request):
-    """Fixture configures auth with credentials from params or env"""
+# @pytest.fixture
+# def configured_auth_ctx(framework_context, request):
+#     """Fixture configures auth with credentials from params or env"""
+#     if hasattr(request, 'param'):
+#         framework_context.tools_manager.auth.configure(**request.param)
+#     else:
+#         framework_context.tools_manager.auth.configure()
+#     return framework_context
+
+@pytest.fixture(scope="function")
+def configured_auth_ctx(base_framework_context, request):
+    """Context for parametrized auth tests"""
     if hasattr(request, 'param'):
-        framework_context.tools_manager.auth.configure(**request.param)
-    else:
-        framework_context.tools_manager.auth.configure()
-    return framework_context
+        base_framework_context.tools_manager.auth.configure(**request.param)
+        base_framework_context.tools_manager.auth.login()
+    return base_framework_context
 
 
 # Авторизация с валидацией полей.

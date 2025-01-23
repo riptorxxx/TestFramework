@@ -58,54 +58,54 @@ def request_to_curl(method, url, headers=None, params=None, json_data=None, cook
     return ' '.join(curl_command)
 
 
-def handle_http(method, url, json=None, headers=None, params=None, cookies=None, timeout=40.0):
-    """
-    Общая функция для выполнения HTTP-запросов и обработки ошибок.
-
-    :param method: (str): HTTP метод (GET, POST, PUT, DELETE).
-    :param url: (str): URL для запроса.
-    :param json: (dict, optional): JSON данные для POST/PUT запросов.
-    :param headers: (dict, optional): Заголовки для запроса.
-    :param params: (dict, optional): Параметры для GET запросов.
-    :param cookies: (dict, optional): Куки для передачи с запросом.
-    :param timeout: (float): Тайм-аут для HTTP клиента.
-    :return: httpx.Response: Ответ от сервера.
-    :raises httpx.HTTPStatusError: Если статус ответа указывает на ошибку.
-            Exception: Для других неожиданных ошибок.
-    """
-    start_time = time.time()
-
-    # Вывод в логи всех запросов в виде CURL
-    curl_command = request_to_curl(method, url, headers, params, json, cookies)
-    logger.info(f"Equivalent CURL command:\n{curl_command}")
-
-    try:
-        with httpx.Client(timeout=timeout) as client:
-            # Set cookies for the client session
-            if cookies:
-                client.cookies.update(cookies)
-
-            if method == 'GET':
-                response = client.get(url, headers=headers, params=params, cookies=cookies)
-            elif method == 'POST':
-                response = client.post(url, json=json, headers=headers, cookies=cookies)
-            elif method == 'PUT':
-                response = client.put(url, json=json, headers=headers, cookies=cookies)
-            elif method == 'DELETE':
-                response = client.delete(url, headers=headers, cookies=cookies)
-            else:
-                raise ValueError(f"Unsupported HTTP method: {method}")
-
-            elapsed_time = time.time() - start_time
-            logger.info(f"{method} {url} completed with status {response.status_code} in {elapsed_time:.2f} seconds")
-            return response
-
-    except httpx.HTTPStatusError as exc:
-        logger.error(f"{method} request failed: {exc.response.status_code} - {exc.response.text}", exc_info=exc)
-        raise
-    except Exception as exc:
-        logger.error(f"Unexpected error in {method}: {str(exc)}")
-        raise
+# def handle_http(method, url, json=None, headers=None, params=None, cookies=None, timeout=40.0):
+#     """
+#     Общая функция для выполнения HTTP-запросов и обработки ошибок.
+#
+#     :param method: (str): HTTP метод (GET, POST, PUT, DELETE).
+#     :param url: (str): URL для запроса.
+#     :param json: (dict, optional): JSON данные для POST/PUT запросов.
+#     :param headers: (dict, optional): Заголовки для запроса.
+#     :param params: (dict, optional): Параметры для GET запросов.
+#     :param cookies: (dict, optional): Куки для передачи с запросом.
+#     :param timeout: (float): Тайм-аут для HTTP клиента.
+#     :return: httpx.Response: Ответ от сервера.
+#     :raises httpx.HTTPStatusError: Если статус ответа указывает на ошибку.
+#             Exception: Для других неожиданных ошибок.
+#     """
+#     start_time = time.time()
+#
+#     # Вывод в логи всех запросов в виде CURL
+#     curl_command = request_to_curl(method, url, headers, params, json, cookies)
+#     logger.info(f"Equivalent CURL command:\n{curl_command}")
+#
+#     try:
+#         with httpx.Client(timeout=timeout) as client:
+#             # Set cookies for the client session
+#             if cookies:
+#                 client.cookies.update(cookies)
+#
+#             if method == 'GET':
+#                 response = client.get(url, headers=headers, params=params, cookies=cookies)
+#             elif method == 'POST':
+#                 response = client.post(url, json=json, headers=headers, cookies=cookies)
+#             elif method == 'PUT':
+#                 response = client.put(url, json=json, headers=headers, cookies=cookies)
+#             elif method == 'DELETE':
+#                 response = client.delete(url, headers=headers, cookies=cookies)
+#             else:
+#                 raise ValueError(f"Unsupported HTTP method: {method}")
+#
+#             elapsed_time = time.time() - start_time
+#             logger.info(f"{method} {url} completed with status {response.status_code} in {elapsed_time:.2f} seconds")
+#             return response
+#
+#     except httpx.HTTPStatusError as exc:
+#         logger.error(f"{method} request failed: {exc.response.status_code} - {exc.response.text}", exc_info=exc)
+#         raise
+#     except Exception as exc:
+#         logger.error(f"Unexpected error in {method}: {str(exc)}")
+#         raise
 
 
 
@@ -119,7 +119,11 @@ class APIClient:
         """
 
         self.base_url = base_url
+        self.http_client = httpx.Client(timeout=40.0)
         self.cookie_manager = CookieManager()
+
+    def __del__(self):
+        self.http_client.close()
 
 
     def update_cookies(self, response):
@@ -129,6 +133,35 @@ class APIClient:
                 response.headers.get_list('Set-Cookie')
             )
             self.cookies.update(new_cookies)
+
+
+    def handle_http(self, method, url, json=None, headers=None, params=None, cookies=None):
+        start_time = time.time()
+        curl_command = request_to_curl(method, url, headers, params, json, cookies)
+        logger.info(f"Equivalent CURL command:\n{curl_command}")
+
+        try:
+            if cookies:
+                self.http_client.cookies.update(cookies)
+
+            if method == 'GET':
+                response = self.http_client.get(url, headers=headers, params=params, cookies=cookies)
+            elif method == 'POST':
+                response = self.http_client.post(url, json=json, headers=headers, cookies=cookies)
+            elif method == 'PUT':
+                response = self.http_client.put(url, json=json, headers=headers, cookies=cookies)
+            elif method == 'DELETE':
+                response = self.http_client.delete(url, headers=headers, cookies=cookies)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+
+            elapsed_time = time.time() - start_time
+            logger.info(f"{method} {url} completed with status {response.status_code} in {elapsed_time:.2f} seconds")
+            return response
+
+        except httpx.HTTPStatusError as exc:
+            logger.error(f"{method} request failed: {exc.response.status_code} - {exc.response.text}", exc_info=exc)
+            raise
 
 
     # def parse_cookies(self, set_cookie_header):
@@ -160,7 +193,7 @@ class APIClient:
 
         url = f"{self.base_url}{endpoint}"
         cookies = self.cookie_manager.get_current_cookies()
-        response = handle_http("GET", url, headers=headers, params=params, cookies=cookies)
+        response = self.handle_http("GET", url, headers=headers, params=params, cookies=cookies)
         self.log_response(response)
         # logger.info(f"GET RESPONSE:  {response.json()}")
         return response
@@ -184,7 +217,7 @@ class APIClient:
             **(cookies or {})
         }
         # self.log_request("POST", url, headers, None, json, request_cookies)
-        response = handle_http("POST", url, json=json, headers=headers, cookies=request_cookies)
+        response = self.handle_http("POST", url, json=json, headers=headers, cookies=request_cookies)
         self.log_response(response)
 
         # Update cookie_manager with new cookies from response

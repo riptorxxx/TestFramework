@@ -10,6 +10,7 @@ class TestExtractor:
         disk_info = {
             'all_disks': set(),
             'free_disks': set(),
+            'free_disks_obj': set(),
             'free_for_wc': set(),
             'free_disks_by_size': {},
             'free_disks_by_size_and_type': {},
@@ -23,6 +24,7 @@ class TestExtractor:
             **extracted,
             'all_disks': list(disk_info['all_disks']),
             'free_disks': list(disk_info['free_disks']),
+            'free_disks_obj': list(disk_info['free_disks_obj']),
             'free_for_wc': list(disk_info['free_for_wc']),
             'free_disks_by_size': disk_info['free_disks_by_size'],
             'free_disks_by_size_and_type': disk_info['free_disks_by_size_and_type'],
@@ -31,6 +33,7 @@ class TestExtractor:
 
     def _process_cluster_data(self, data, extracted, disk_info):
         """Process cluster data recursively"""
+        print(f"DEBUG: Processing cluster data: {data}")  # Add this line
         if isinstance(data, dict):
             self._process_dict(data, extracted, disk_info)
         elif isinstance(data, list):
@@ -112,6 +115,7 @@ class TestExtractor:
             if not pools and used_as_wc == 0:
                 # logger.info(f"Disk {disk_name} is free")
                 disk_info['free_disks'].add(disk_name)
+                disk_info['free_disks_obj'].add(disk_name)  # Add full disk object
                 if size:
                     disk_info['free_disks_by_size'].setdefault(size, []).append(disk_name)
                     if disk_type:

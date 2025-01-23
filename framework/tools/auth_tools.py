@@ -269,7 +269,13 @@ class AuthTools(BaseTools):
 
 
     def needs_token_refresh(self) -> bool:
-        """Check if token needs refresh based on expiration time"""
+        """Check if token needs refresh based on expiration time
+            Проверяем наличие session_data
+            Устанавливаем время первого входа если его нет
+            Вычисляем время прошедшее с последнего обновления
+            Возвращаем True если прошло больше 170 секунд (3 минуты минус 10 секунд)
+            Проверка выполняется в цикле с интервалом, указанным в refresh_interval
+        """
         if not self._session_data:
             return False
 
@@ -359,3 +365,7 @@ class AuthTools(BaseTools):
         self._last_refresh_time = None
 
         return response
+
+    def is_authenticated(self) -> bool:
+        """Check if client is authenticated and has active token refresher"""
+        return bool(self._token_refresher)

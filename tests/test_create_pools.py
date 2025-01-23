@@ -1,161 +1,221 @@
 import pytest
+from typing import Dict
 from framework.models.pool_models import PoolConfig
 from framework.models.disk_models import DiskType, DiskSelection
 
 
+@pytest.mark.nc
 @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
 @pytest.mark.parametrize("keys_to_extract", [["name"]])
 @pytest.mark.parametrize("pool_config", [
     PoolConfig(
-        name="test_raid1",
-        raid_type="raid1",
-        main_disks_count=2,
-        main_disks_type="HDD",
-        wr_cache_disk_count=1,
-        wrc_disk_type="SSD"
-    ),
-    PoolConfig(
-        name="test_raid6",
         raid_type="raid6",
-        main_disks_count=4,
-        main_disks_type="HDD",
-        wr_cache_disk_count=2,
-        wrc_disk_type="SSD",
-        rd_cache_disk_count=2,
-        rdc_disk_type="SSD",
-        spare_cache_disk_count=2,
-        spare_disk_type="HDD"
-    )
-])
-def test_create_pool_with_disk_selection(framework_context, pool_config):
-    # Get cluster data
-    cluster_data = framework_context.cluster.get_cluster_info()
-
-    # Select disks using our selector
-    selected_disks = framework_context.cluster.disk_selector.select_disks(cluster_data, pool_config)
-
-    # Create pool
-    pool = framework_context.cluster.create_pool(
-        name=pool_config.name,
-        raid_type=pool_config.raid_type,
-        main_disks=selected_disks.main_disks,
-        wrc_disks=selected_disks.wrc_disks,
-        rdc_disks=selected_disks.rdc_disks,
-        spare_disks=selected_disks.spare_disks
-    )
-
-    # Verify pool creation
-    assert pool.status == "healthy"
-    assert len(pool.main_disks) == pool_config.main_disks_count
-    if pool_config.wr_cache_disk_count:
-        assert len(pool.wrc_disks) == pool_config.wr_cache_disk_count
-
-
-
-
-
-def test_create_minimal_pool(test_context):
-    pool = test_context.tools_manager.pools.configure(
-        name="test_pool",
-        node=1,
-        main_disks_count=2,
+        mainDisksCount=4,
+        mainGroupsCount=1,
+        mainDisksSize=322122547200,
+        mainDisksType=DiskType.HDD,
+        wrCacheDiskCount=2,
+        wrcDiskType=DiskType.SSD,
         auto_configure=True
-    ).create_pool()
-
-    assert pool["name"] == "test_pool"
-    assert pool["node"] == 1
-
-@pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
-@pytest.mark.parametrize("keys_to_extract", [["name"]])
-@pytest.mark.parametrize("pool_config", [
-    {
-        "auto_configure": False,
-        "raid_type": "raid1",
-        "main_disks": 2,
-        "wrc_disks": 1,
-        "rdc_disks": 1,
-        "spare_disks": 1
-    },
-    {
-        "auto_configure": False,
-        "raid_type": "raid5",
-        "main_disks": 3,
-        "wrc_disks": 2,
-        "rdc_disks": 0,
-        "spare_disks": 1
-    }
+    )
 ])
-def test_create_pool_manual(framework_context, pool_config):
-    """Test pool creation with manual disk selection"""
-    framework_context.tools_manager.auth.configure()
-    pool_tool = framework_context.tools_manager.pool
-
-    # Configure pool
-    pool_tool.configure(**pool_config)
-
-    # Create pool
-    response = pool_tool.create_pool()
-    assert response["status"] == "success"
-
-    # Cleanup
-    pool_tool.delete_pool(response["name"])
+def test_create_pool(framework_context, pool_config, keys_to_extract):
+    # auth_tools = framework_context.tools_manager.auth
+    # auth_tools.configure()
+    # auth_tools.login()
+    framework_context.tools_manager.pool.configure(pool_config)
+    response = framework_context.tools_manager.pool.create()
+    assert response["status"] == "healthy"
+    # auth_tools.logout()
 
 
-@pytest.mark.parametrize("base_url", ["NODE_1", "NODE_2"], indirect=True)
-@pytest.mark.parametrize("pool_config", [
-    {
-        "raid_type": "raid1",
-        "main_disks_type": "SSD",
-        "main_disks_count": 2,
-        "main_groups_count": 1
-    },
-    {
-        "raid_type": "raid5",
-        "main_disks_type": "HDD",
-        "main_disks_count": 3,
-        "main_groups_count": 1,
-        "wr_cache_disk_count": 2,
-        "wrc_disk_type": "SSD"
-    }
-])
-def test_create_pool_auto(configured_auth_ctx, pool_config):
-    """Test pool creation with automatic disk selection"""
-    pool_tool = configured_auth_ctx.tools_manager.pools
-
-    # Configure pool
-    pool_tool.configure(**pool_config)
-
-    # Create pool
-    response = pool_tool.create_pool()
-    assert response["status"] == "success"
-
-    # Cleanup
-    pool_tool.delete_pool(response["name"])
 
 
-@pytest.mark.pc
-@pytest.mark.parametrize("base_url", ["NODE_1", "NODE_2"], indirect=True)
-@pytest.mark.parametrize("keys_to_extract", [["name"]])
-@pytest.mark.parametrize("pool_config", [
-    PoolConfig(raid_type="raid1", main_disks=2, wrc_disks=0, rdc_disks=0, spare_disks=0),
-    # PoolConfig(raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=0, spareDisks=0),
-    # PoolConfig(raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=1, spareDisks=0),
-    # PoolConfig(raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=0, spareDisks=1),
-    # PoolConfig(raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=2, spareDisks=2),
-])
-def test_pool_creation(framework_context, pool_config):
-    # Login with parametrized data
-    framework_context.tools_manager.auth.login()
+# @pytest.mark.parametrize("base_url", ["NODE_1", "NODE_2"], indirect=True)
+# def test_create_pool_auto(framework_context):
+#     # Fully automatic pool creation
+#     response = framework_context.tools_manager.pool.create()
+#     assert response.status_code == 200
+#
+#
+# @pytest.mark.parametrize("base_url", ["NODE_1", "NODE_2"], indirect=True)
+# @pytest.mark.parametrize("keys_to_extract", [["name"]])
+# @pytest.mark.parametrize("pool_config", [
+#     PoolConfig(raid_type="raid6", main_disks_count=4, wr_cache_disk_count=2)
+# ])
+# def test_create_pool(framework_context, pool_config, keys_to_extract):
+#     # Get cluster data with specified keys
+#     cluster_data = framework_context.tools_manager.cluster.get_cluster_info(keys_to_extract)
+#
+#     # Select disks using our disk selector
+#     selected_disks = framework_context.tools_manager.disk_selector.select_disks(cluster_data, pool_config)
+#
+#     # Create pool with selected disks
+#     pool = framework_context.tools_manager.pool.create(
+#         name=pool_config.name,
+#         raid_type=pool_config.raid_type,
+#         main_disks=selected_disks.main_disks,
+#         wrc_disks=selected_disks.wrc_disks
+#     )
 
-    # Create pools using pools tools
-    pool_config = {...}
-    result = framework_context.tools_manager.pools.create_pool(pool_config)
 
-    # Assertions
-    assert result["status"] == "success"
 
-    # Cleanup
-    framework_context.tools_manager.auth.logout()
+
+
+
+# @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
+# @pytest.mark.parametrize("keys_to_extract", [["name"]])
+# @pytest.mark.parametrize("pool_config", [
+#     PoolConfig(
+#         name="test_raid1",
+#         raid_type="raid1",
+#         main_disks_count=2,
+#         main_disks_type="HDD",
+#         wr_cache_disk_count=1,
+#         wrc_disk_type="SSD"
+#     ),
+#     PoolConfig(
+#         name="test_raid6",
+#         raid_type="raid6",
+#         main_disks_count=4,
+#         main_disks_type="HDD",
+#         wr_cache_disk_count=2,
+#         wrc_disk_type="SSD",
+#         rd_cache_disk_count=2,
+#         rdc_disk_type="SSD",
+#         spare_cache_disk_count=2,
+#         spare_disk_type="HDD"
+#     )
+# ])
+# def test_create_pool_with_disk_selection(framework_context, pool_config):
+#     # Get cluster data
+#     cluster_data = framework_context.cluster.get_cluster_info()
+#
+#     # Select disks using our selector
+#     selected_disks = framework_context.cluster.disk_selector.select_disks(cluster_data, pool_config)
+#
+#     # Create pool
+#     pool = framework_context.cluster.create_pool(
+#         name=pool_config.name,
+#         raid_type=pool_config.raid_type,
+#         main_disks=selected_disks.main_disks,
+#         wrc_disks=selected_disks.wrc_disks,
+#         rdc_disks=selected_disks.rdc_disks,
+#         spare_disks=selected_disks.spare_disks
+#     )
+#
+#     # Verify pool creation
+#     assert pool.status == "healthy"
+#     assert len(pool.main_disks) == pool_config.main_disks_count
+#     if pool_config.wr_cache_disk_count:
+#         assert len(pool.wrc_disks) == pool_config.wr_cache_disk_count
+#
+#
+#
+#
+#
+# def test_create_minimal_pool(test_context):
+#     pool = test_context.tools_manager.pools.configure(
+#         name="test_pool",
+#         node=1,
+#         main_disks_count=2,
+#         auto_configure=True
+#     ).create_pool()
+#
+#     assert pool["name"] == "test_pool"
+#     assert pool["node"] == 1
+#
+# @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
+# @pytest.mark.parametrize("keys_to_extract", [["name"]])
+# @pytest.mark.parametrize("pool_config", [
+#     {
+#         "auto_configure": False,
+#         "raid_type": "raid1",
+#         "main_disks": 2,
+#         "wrc_disks": 1,
+#         "rdc_disks": 1,
+#         "spare_disks": 1
+#     },
+#     {
+#         "auto_configure": False,
+#         "raid_type": "raid5",
+#         "main_disks": 3,
+#         "wrc_disks": 2,
+#         "rdc_disks": 0,
+#         "spare_disks": 1
+#     }
+# ])
+# def test_create_pool_manual(framework_context, pool_config):
+#     """Test pool creation with manual disk selection"""
+#     framework_context.tools_manager.auth.configure()
+#     pool_tool = framework_context.tools_manager.pool
+#
+#     # Configure pool
+#     pool_tool.configure(**pool_config)
+#
+#     # Create pool
+#     response = pool_tool.create_pool()
+#     assert response["status"] == "success"
+#
+#     # Cleanup
+#     pool_tool.delete_pool(response["name"])
+#
+#
+# @pytest.mark.parametrize("base_url", ["NODE_1", "NODE_2"], indirect=True)
+# @pytest.mark.parametrize("pool_config", [
+#     {
+#         "raid_type": "raid1",
+#         "main_disks_type": "SSD",
+#         "main_disks_count": 2,
+#         "main_groups_count": 1
+#     },
+#     {
+#         "raid_type": "raid5",
+#         "main_disks_type": "HDD",
+#         "main_disks_count": 3,
+#         "main_groups_count": 1,
+#         "wr_cache_disk_count": 2,
+#         "wrc_disk_type": "SSD"
+#     }
+# ])
+# def test_create_pool_auto(configured_auth_ctx, pool_config):
+#     """Test pool creation with automatic disk selection"""
+#     pool_tool = configured_auth_ctx.tools_manager.pools
+#
+#     # Configure pool
+#     pool_tool.configure(**pool_config)
+#
+#     # Create pool
+#     response = pool_tool.create_pool()
+#     assert response["status"] == "success"
+#
+#     # Cleanup
+#     pool_tool.delete_pool(response["name"])
+#
+#
+# @pytest.mark.pc
+# @pytest.mark.parametrize("base_url", ["NODE_1", "NODE_2"], indirect=True)
+# @pytest.mark.parametrize("keys_to_extract", [["name"]])
+# @pytest.mark.parametrize("pool_config", [
+#     PoolConfig(raid_type="raid1", main_disks=2, wrc_disks=0, rdc_disks=0, spare_disks=0),
+#     # PoolConfig(raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=0, spareDisks=0),
+#     # PoolConfig(raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=1, spareDisks=0),
+#     # PoolConfig(raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=0, spareDisks=1),
+#     # PoolConfig(raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=2, spareDisks=2),
+# ])
+# def test_pool_creation(framework_context, pool_config):
+#     # Login with parametrized data
+#     framework_context.tools_manager.auth.login()
+#
+#     # Create pools using pools tools
+#     pool_config = {...}
+#     result = framework_context.tools_manager.pools.create_pool(pool_config)
+#
+#     # Assertions
+#     assert result["status"] == "success"
+#
+#     # Cleanup
+#     framework_context.tools_manager.auth.logout()
 
 
 

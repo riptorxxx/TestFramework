@@ -16,11 +16,12 @@ class ToolsManager:
         self._register_default_tools()
 
     def _register_default_tools(self):
-        self.register_tool('pools', PoolTools)
-        self.register_tool('disk', DiskTools)
-        self.register_tool('cluster', ClusterTools)
         self.register_tool('auth', AuthTools)
         self.register_tool('connection', ConnectionTools)
+        self.register_tool('cluster', ClusterTools)
+        self.register_tool('disk', DiskTools)
+        self.register_tool('pools', PoolTools)
+
 
     def register_tool(self, name: str, tool_class: Type[BaseTools]):
         self._tools[name] = tool_class(self._context)

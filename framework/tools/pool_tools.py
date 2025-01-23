@@ -1,8 +1,13 @@
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
+from framework.helpers.generators import Generates
+from framework.helpers.retry import disk_operation_with_retry
+from framework.models.pool_models import PoolConfig
 from .base_tools import BaseTools
-from ..models.pool_models import PoolConfig
-from ..helpers.retry import disk_operation_with_retry
+from ..core.logger import logger
 from ..resources.disks.disk_selector import DiskSelector
+from ..helpers.test_params import get_test_params
+from httpx import Response
+
 
 
 class PoolTools(BaseTools):
@@ -10,71 +15,84 @@ class PoolTools(BaseTools):
         super().__init__(context)
         self._config: Optional[PoolConfig] = None
         self.current_pool = None
-        # self._disk_selector = DiskSelector(context.tools_manager.disks)
-        self._disk_tool = disk_tool or context.tools_manager.get_tool('disks')
+        self._pool_names: List[str] = []
+        # self._disk_selector = self._context.tools_manager.disk_selector
+        # Initialize disk_selector later when needed
+        self._disk_selector = DiskSelector(self)
 
-    def configure(self, **kwargs) -> 'PoolTools':
-        """Configure pool parameters"""
-        self._config = PoolConfig(**kwargs)
-        return self
+
+    @property
+    def disk_selector(self):
+        if self._disk_selector is None:
+            self._disk_selector = self._context.tools_manager.disk_selector
+        return self._disk_selector
+
+    def configure(self, config: Union[PoolConfig, dict]):
+        if isinstance(config, PoolConfig):
+            config = config.__dict__
+        self._config = PoolConfig(**config)
+
+    # def configure(self, **kwargs) -> 'PoolTools':
+    #     """Configure pool parameters"""
+    #     self._config = PoolConfig(**kwargs)
+    #     return self
 
     def validate(self):
         """Validate cluster state before pool operations"""
         self._context.tools_manager.cluster.validate()
 
     @disk_operation_with_retry()
-    def create_pool(self) -> dict:
-        """Create pool with current configuration"""
-        if not self._config:
-            raise ValueError("Pool configuration not set")
-
+    def create(self, **custom_params) -> dict:
         self.validate()
+        request_data = self._prepare_request_data()
+        response = self._make_request(request_data)
+        return self._process_response(response)
 
-        # Select and update disks configuration
-        selected_disks = self.select_disks_for_pool()
-        self._update_pool_disks(selected_disks)
+    def _prepare_request_data(self) -> dict:
+        if not self._config:
+            self._config = PoolConfig()
 
-        response = self._context.client.post(
-            "/pools",
-            json=self._config.to_request()
+        request_data = self._config.to_request()
+        request_data.update(self._get_dynamic_params())
+
+        if not self._config.auto_configure:
+            request_data.update(self._get_disk_configuration())
+
+        return request_data
+
+    def _get_dynamic_params(self) -> dict:
+        # Gets node number from already configured connection
+        current_node = self._context.tools_manager.connection.get_current_config()
+        node_number = int(current_node.node.replace('NODE_', '')) if current_node else 1
+        return {
+            'node': node_number,
+            'name': self._generate_pool_name() # Вынести хелперы в отдельный tool.
+        }
+
+    def _get_disk_configuration(self) -> dict:
+        cluster_data = self._context.tools_manager.cluster.get_cluster_info(
+            keys_to_extract=get_test_params(self._context).get('keys_to_extract')
+        )
+        return self._disk_selector.select_disks(cluster_data, self._config)
+
+    def _make_request(self, request_data: Dict) -> Response:
+        """Make API request using context client"""
+        return self._context.client.post(
+            f"/pools/{request_data['name']}",
+            json=request_data
         )
 
+    def _process_response(self, response: Response) -> dict:
+        """Process API response"""
         if response.status_code != 201:
-            raise ValueError(f"Failed to create pool: {response.text}")
-
+            raise ValueError(f"Unexpected status code. Failed to create pool. : {response.text}")
         self.current_pool = response.json()
         return self.current_pool
 
-    def select_disks_for_pool(self) -> tuple:
-        """Select disks based on pool configuration"""
-        disk_tool = self._context.tools_manager.disks
 
-        if self._config.auto_configure:
-            return disk_tool.select_disks_auto(
-                main_type=self._config.main_disks_type,
-                main_count=self._config.main_disks_count,
-                wrc_type=self._config.wrc_disk_type,
-                wrc_count=self._config.wr_cache_disk_count,
-                rdc_type=self._config.rdc_disk_type,
-                rdc_count=self._config.rd_cache_disk_count,
-                spare_type=self._config.spare_disk_type,
-                spare_count=self._config.spare_cache_disk_count
-            )
-        else:
-            return disk_tool.select_disks_manual(
-                main_count=self._config.main_disks,
-                wrc_count=self._config.wrc_disks,
-                rdc_count=self._config.rdc_disks,
-                spare_count=self._config.spare_disks
-            )
-
-    def _update_pool_disks(self, selected_disks: tuple):
-        """Update pool configuration with selected disks"""
-        main_disks, wrc_disks, rdc_disks, spare_disks = selected_disks
-        self._config.main_disks = main_disks
-        self._config.wrc_disks = wrc_disks
-        self._config.rdc_disks = rdc_disks
-        self._config.spare_disks = spare_disks
+    def _generate_pool_name(self) -> str:
+        """Generate unique pool name"""
+        return f"{Generates.random_string(8)}"
 
     def delete_pool(self, pool_name: str) -> None:
         """Delete pool by name"""
@@ -83,40 +101,92 @@ class PoolTools(BaseTools):
         if response.status_code not in (200, 204):
             raise ValueError(f"Failed to delete pool: {response.text}")
 
-        self.current_pool = None
+        if pool_name in self._pool_names:
+            self._pool_names.remove(pool_name)
+
+        if self.current_pool and self.current_pool['name'] == pool_name:
+            self.current_pool = None
 
     def cleanup(self):
-        """Cleanup created pools"""
-        if self.current_pool:
-            self.delete_pool(self.current_pool['name'])
+        """Cleanup all created pools"""
+        for pool_name in self._pool_names[:]:
+            self.delete_pool(pool_name)
+        self._pool_names.clear()
 
-#
-# class PoolTools(BaseTools):
-#     """Tools for pools operations"""
-#
-#     def __init__(self, context):
-#         super().__init__(context)
-#         self.current_pool = None
-#
-#     def validate(self):
-#         self._context.tools_manager.cluster.validate()
-#
-#     @disk_operation_with_retry()
-#     def create_pool(self, pool_config: PoolConfig):
-#         """Create pools with configuration"""
-#         self.validate()
-#         selected_disks = self._context.tools_manager.disk.select_disks_for_pool(pool_config)
-#         pool_config.update_disks(selected_disks)
-#
-#         response = self._context.client.post(
-#             "/pools",
-#             json=pool_config.to_request_data()
-#         )
-#         assert response.status_code == 200
-#         self.current_pool = response.json()
-#         return self.current_pool
-#
-#     def cleanup(self):
-#         """Cleanup created pools"""
-#         if self.current_pool:
-#             self._context.client.delete(f"/pools/{self.current_pool['name']}")
+    # @disk_operation_with_retry()
+    # def create(self, **custom_params) -> dict:
+    #     """
+    #     Create pool with automatic or custom parameters
+    #
+    #     Args:
+    #         **custom_params: Optional parameters to override defaults
+    #     """
+    #     self.validate()
+    #
+    #     if not self._config and not custom_params:
+    #         self._config = PoolConfig()
+    #
+    #     # Get current node from connection context
+    #     current_node = self._context.tools_manager.connection.get_current_config()
+    #     node_number = int(current_node.node.replace('NODE_', '')) if current_node else 1
+    #
+    #     # Get keys_to_extract from context if available
+    #     keys_to_extract = get_test_params(self._context).get('keys_to_extract')
+    #     logger.info(f"keys_to_extract: {keys_to_extract}")
+    #
+    #     # Pass keys_to_extract to get_cluster_info
+    #     cluster_data = self._context.tools_manager.cluster.get_cluster_info(keys_to_extract=keys_to_extract)
+    #     logger.info(f"cluster_data: {cluster_data}")
+    #     selected_disks = self._disk_selector.select_disks(cluster_data, self._config)
+    #     logger.info(f"Debug: selected_disks = {selected_disks}")
+    #
+    #     # Generate pool name
+    #     pool_name = custom_params.get('name') or self._generate_pool_name()
+    #     self._pool_names.append(pool_name)
+    #
+    #     # Prepare base parameters
+    #     params = {
+    #         'name': pool_name,
+    #         'node': node_number,
+    #         'raid_type': custom_params.get('raid_type', self._config.raid_type),
+    #         'performance_type': self._config.perfomance_type,
+    #         'percentage': self._config.percentage,
+    #         'priority': self._config.priority,
+    #         'auto_configure': self._config.auto_configure,
+    #         'main_disks': selected_disks['main_disks'],
+    #         'wrc_disks': selected_disks['wrc_disks'],
+    #         'rdc_disks': selected_disks['rdc_disks'],
+    #         'spare_disks': selected_disks['spare_disks']
+    #     }
+    #
+    #     response = self._context.client.post(f"/pools/{pool_name}", json=params)
+    #
+    #     if response.status_code != 201:
+    #         raise ValueError(f"Failed to create pool: {response.text}")
+    #
+    #     self.current_pool = response.json()
+    #     return self.current_pool
+
+
+    # def _select_disks_for_pool(self, cluster_data) -> tuple:
+    #     if self._config.auto_configure:
+    #         return self._disk_selector.select_disks_auto(
+    #             cluster_data,
+    #             main_type=self._config.main_disks_type,
+    #             main_count=self._config.main_disks_count,
+    #             wrc_type=self._config.wrc_disk_type,
+    #             wrc_count=self._config.wr_cache_disk_count,
+    #             rdc_type=self._config.rdc_disk_type,
+    #             rdc_count=self._config.rd_cache_disk_count,
+    #             spare_type=self._config.spare_disk_type,
+    #             spare_count=self._config.spare_cache_disk_count
+    #         )
+    #     return self._disk_selector.select_disks_manual(
+    #         cluster_data,
+    #         main_disks=self._config.main_disks,
+    #         wrc_disks=self._config.wrc_disks,
+    #         rdc_disks=self._config.rdc_disks,
+    #         spare_disks=self._config.spare_disks
+    #     )
+
+

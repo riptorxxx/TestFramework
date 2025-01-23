@@ -1,78 +1,70 @@
-from typing import List, Dict
-from .base import DiskSelectionStrategy
+from typing import List, Dict, Optional
+from framework.models.disk_models import DiskSelection, ClusterDisks
 from framework.models.pool_models import PoolConfig
+from .base import DiskSelectionStrategy
+
 
 class AutoConfigureStrategy(DiskSelectionStrategy):
-    """Strategy for automatic disk selection"""
+    def select_disks(self, free_disks: list, disks_info: dict, pool_config) -> dict:
+        if pool_config.perfomance_type == 0:
+            main_disks = [disk for disk in free_disks
+                          if disks_info[disk]['type'] == 'SSD'][:pool_config.mainDisksCount]
+        else:
+            main_disks = [disk for disk in free_disks
+                          if disks_info[disk]['type'] == pool_config.mainDisksType][:pool_config.mainDisksCount]
 
-    def select_disks(self, cluster_info: dict, pool_config: PoolConfig) -> tuple:
-        """Select disks automatically based on configuration"""
-        return (
-            self._select_main_disks(cluster_info, pool_config),
-            self._select_wrc_disks(cluster_info, pool_config),
-            self._select_rdc_disks(cluster_info, pool_config),
-            self._select_spare_disks(cluster_info, pool_config)
-        )
+        remaining_disks = [d for d in free_disks if d not in main_disks]
+        cache_disks = [d for d in remaining_disks if disks_info[d]['type'] == 'SSD']
 
-    def _select_main_disks(self, cluster_info: dict, pool_config: PoolConfig) -> List[str]:
-        """Select main disks based on configuration"""
-        disks = cluster_info['free_disks_by_size_and_type']
-        return self._select_disks_by_params(
-            disks,
-            pool_config.main_disks_count,
-            pool_config.main_disks_type,
-            pool_config.main_disks_size
-        )
+        return {
+            'main_disks': main_disks,
+            'cache_disks': cache_disks[:pool_config.wrCacheDiskCount] if hasattr(pool_config,
+                                                                                 'wrCacheDiskCount') else []
+        }
 
-    def _select_wrc_disks(self, cluster_info: dict, pool_config: PoolConfig) -> List[str]:
-        """Select write cache disks"""
-        return self._select_disks_by_params(
-            cluster_info['free_for_wc'],
-            pool_config.wr_cache_disk_count,
-            pool_config.wrc_disk_type,
-            pool_config.wrc_disk_size,
-            ssd_only=True
-        )
+    def _select_main_disks(
+            self,
+            available_disks: Dict[str, dict],
+            count: int,
+            disk_type: str
+    ) -> List[dict]:
+        filtered_disks = [
+            disk for disk in available_disks.values()
+            if disk['type'] == disk_type
+        ]
+        return filtered_disks[:count]
 
-    def _select_rdc_disks(self, cluster_info: dict, pool_config: PoolConfig) -> List[str]:
-        """Select read cache disks"""
-        return self._select_disks_by_params(
-            cluster_info['free_disks'],
-            pool_config.rd_cache_disk_count,
-            pool_config.rdc_disk_type,
-            pool_config.rdc_disk_size,
-            ssd_only=True
-        )
-
-    def _select_spare_disks(self, cluster_info: dict, pool_config: PoolConfig) -> List[str]:
-        """Select spare disks matching main disk parameters"""
-        return self._select_disks_by_params(
-            cluster_info['free_disks'],
-            pool_config.spare_cache_disk_count,
-            pool_config.spare_disk_type,
-            pool_config.spare_disk_size
-        )
-
-    def _select_disks_by_params(
-        self,
-        available_disks: Dict,
-        count: int,
-        disk_type: str,
-        disk_size: int,
-        ssd_only: bool = False
-    ) -> List[str]:
-        """Helper method to select disks by parameters"""
-        if count == 0:
+    def _select_cache_disks(
+            self,
+            available_disks: Dict[str, dict],
+            count: int,
+            used_disks: set
+    ) -> List[dict]:
+        if not count:
             return []
 
         filtered_disks = [
-            disk for disk in available_disks
-            if (not disk_type or disk['type'] == disk_type) and
-               (not disk_size or disk['size'] == disk_size) and
-               (not ssd_only or disk['type'] == 'SSD')
+            disk for disk in available_disks.values()
+            if disk['name'] not in used_disks and
+               disk['type'] == "SSD" and
+               disk['used_as_wc'] == 0
         ]
+        return filtered_disks[:count]
 
-        if len(filtered_disks) < count:
-            raise ValueError(f"Not enough disks matching criteria. Required: {count}")
+    def _select_spare_disks(
+            self,
+            available_disks: Dict[str, dict],
+            count: int,
+            main_disk: Optional[dict],
+            used_disks: set
+    ) -> List[dict]:
+        if not count or not main_disk:
+            return []
 
+        filtered_disks = [
+            disk for disk in available_disks.values()
+            if disk['name'] not in used_disks and
+               disk['type'] == main_disk['type'] and
+               disk['size'] == main_disk['size']
+        ]
         return filtered_disks[:count]
