@@ -33,7 +33,7 @@ class TestExtractor:
 
     def _process_cluster_data(self, data, extracted, disk_info):
         """Process cluster data recursively"""
-        print(f"DEBUG: Processing cluster data: {data}")  # Add this line
+        # print(f"DEBUG: Processing cluster data: {data}")  # Add this line
         if isinstance(data, dict):
             self._process_dict(data, extracted, disk_info)
         elif isinstance(data, list):

@@ -58,57 +58,6 @@ def request_to_curl(method, url, headers=None, params=None, json_data=None, cook
     return ' '.join(curl_command)
 
 
-# def handle_http(method, url, json=None, headers=None, params=None, cookies=None, timeout=40.0):
-#     """
-#     Общая функция для выполнения HTTP-запросов и обработки ошибок.
-#
-#     :param method: (str): HTTP метод (GET, POST, PUT, DELETE).
-#     :param url: (str): URL для запроса.
-#     :param json: (dict, optional): JSON данные для POST/PUT запросов.
-#     :param headers: (dict, optional): Заголовки для запроса.
-#     :param params: (dict, optional): Параметры для GET запросов.
-#     :param cookies: (dict, optional): Куки для передачи с запросом.
-#     :param timeout: (float): Тайм-аут для HTTP клиента.
-#     :return: httpx.Response: Ответ от сервера.
-#     :raises httpx.HTTPStatusError: Если статус ответа указывает на ошибку.
-#             Exception: Для других неожиданных ошибок.
-#     """
-#     start_time = time.time()
-#
-#     # Вывод в логи всех запросов в виде CURL
-#     curl_command = request_to_curl(method, url, headers, params, json, cookies)
-#     logger.info(f"Equivalent CURL command:\n{curl_command}")
-#
-#     try:
-#         with httpx.Client(timeout=timeout) as client:
-#             # Set cookies for the client session
-#             if cookies:
-#                 client.cookies.update(cookies)
-#
-#             if method == 'GET':
-#                 response = client.get(url, headers=headers, params=params, cookies=cookies)
-#             elif method == 'POST':
-#                 response = client.post(url, json=json, headers=headers, cookies=cookies)
-#             elif method == 'PUT':
-#                 response = client.put(url, json=json, headers=headers, cookies=cookies)
-#             elif method == 'DELETE':
-#                 response = client.delete(url, headers=headers, cookies=cookies)
-#             else:
-#                 raise ValueError(f"Unsupported HTTP method: {method}")
-#
-#             elapsed_time = time.time() - start_time
-#             logger.info(f"{method} {url} completed with status {response.status_code} in {elapsed_time:.2f} seconds")
-#             return response
-#
-#     except httpx.HTTPStatusError as exc:
-#         logger.error(f"{method} request failed: {exc.response.status_code} - {exc.response.text}", exc_info=exc)
-#         raise
-#     except Exception as exc:
-#         logger.error(f"Unexpected error in {method}: {str(exc)}")
-#         raise
-
-
-
 class APIClient:
 
     def __init__(self, base_url):
@@ -126,34 +75,44 @@ class APIClient:
         self.http_client.close()
 
 
-    def update_cookies(self, response):
-        """Update cookies from response"""
-        if 'Set-Cookie' in response.headers:
-            new_cookies = self.cookie_manager.parse_set_cookie_header(
-                response.headers.get_list('Set-Cookie')
-            )
-            self.cookies.update(new_cookies)
+    # def update_cookies(self, response):
+    #     """Update cookies from response"""
+    #     if 'Set-Cookie' in response.headers:
+    #         new_cookies = self.cookie_manager.parse_set_cookie_header(
+    #             response.headers.get_list('Set-Cookie')
+    #         )
+    #         self.cookies.update(new_cookies)
 
 
     def handle_http(self, method, url, json=None, headers=None, params=None, cookies=None):
         start_time = time.time()
-        curl_command = request_to_curl(method, url, headers, params, json, cookies)
+
+        # Merge default cookies from cookie_manager with custom cookies
+        request_cookies = {
+            **self.cookie_manager.get_current_cookies(),
+            **(cookies or {})
+        }
+
+        curl_command = request_to_curl(method, url, headers, params, json, request_cookies)
         logger.info(f"Equivalent CURL command:\n{curl_command}")
 
         try:
-            if cookies:
-                self.http_client.cookies.update(cookies)
+            # if cookies:
+            #     self.http_client.cookies.update(cookies)
 
             if method == 'GET':
-                response = self.http_client.get(url, headers=headers, params=params, cookies=cookies)
+                response = self.http_client.get(url, headers=headers, params=params, cookies=request_cookies)
             elif method == 'POST':
-                response = self.http_client.post(url, json=json, headers=headers, cookies=cookies)
+                response = self.http_client.post(url, json=json, headers=headers, cookies=request_cookies)
             elif method == 'PUT':
-                response = self.http_client.put(url, json=json, headers=headers, cookies=cookies)
+                response = self.http_client.put(url, json=json, headers=headers, cookies=request_cookies)
             elif method == 'DELETE':
-                response = self.http_client.delete(url, headers=headers, cookies=cookies)
+                response = self.http_client.delete(url, headers=headers, cookies=request_cookies)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
+
+            # Update cookies from response
+            self.cookie_manager.update_from_response(response)
 
             elapsed_time = time.time() - start_time
             logger.info(f"{method} {url} completed with status {response.status_code} in {elapsed_time:.2f} seconds")
@@ -181,18 +140,19 @@ class APIClient:
 
 
     @allure.step("Sending GET request to {endpoint}")
-    def get(self, endpoint, headers=None, params=None):
+    def get(self, endpoint, headers=None, params=None, cookies=None):
         """
         Выполняет GET запрос к указанному эндпоинту.
 
         :param endpoint: (str): Эндпоинт для запроса.
         :param headers: (dict, optional): Заголовки для запроса.
-        :param params: (dict, optional): Параметры запроса.
+        :param cookies: (dict or None): Кастомные куки для запроса.
+        :param cookies:
         :return: httpx.Response: Ответ от сервера.
         """
 
         url = f"{self.base_url}{endpoint}"
-        cookies = self.cookie_manager.get_current_cookies()
+        # cookies = self.cookie_manager.get_current_cookies()
         response = self.handle_http("GET", url, headers=headers, params=params, cookies=cookies)
         self.log_response(response)
         # logger.info(f"GET RESPONSE:  {response.json()}")
@@ -211,14 +171,8 @@ class APIClient:
         """
         url = f"{self.base_url}{endpoint}"
 
-        # Merge default cookies from cookie_manager with custom cookies
-        request_cookies = {
-            **self.cookie_manager.get_current_cookies(),
-            **(cookies or {})
-        }
         # self.log_request("POST", url, headers, None, json, request_cookies)
-        response = self.handle_http("POST", url, json=json, headers=headers, cookies=request_cookies)
-        self.log_response(response)
+        response = self.handle_http("POST", url, json=json, headers=headers, cookies=cookies)
 
         # Update cookie_manager with new cookies from response
         self.cookie_manager.update_from_response(response)
@@ -228,34 +182,36 @@ class APIClient:
 
 
     @allure.step("Sending PUT request to {endpoint}")
-    def put(self, endpoint, json=None, headers=None):
+    def put(self, endpoint, json=None, headers=None, cookies=None):
         """
         Выполняет PUT запрос к указанному эндпоинту.
 
         :param endpoint: (str): Эндпоинт для запроса.
         :param json: (dict or list): Данные JSON для отправки в теле запроса.
         :param headers: (dict or None): Заголовки для запроса.
+        :param cookies: (dict or None): Кастомные куки для запроса.
         :return: httpx.Response: Ответ от сервера.
         """
 
         url = f"{self.base_url}{endpoint}"
-        response = handle_http("PUT", url, json=json, headers=headers, cookies=self.cookies)
+        response = self.handle_http("PUT", url, json=json, headers=headers, cookies=cookies)
         self.log_response(response)
         return response
 
 
     @allure.step("Sending DELETE request to {endpoint}")
-    def delete(self, endpoint, headers=None):
+    def delete(self, endpoint, headers=None, cookies=None):
         """
         Выполняет DELETE запрос к указанному эндпоинту.
 
         :param endpoint: (str): Эндпоинт для запроса.
         :param headers: (dict or None): Заголовки для запроса.
+        :param cookies: (dict or None): Кастомные куки для запроса.
         :return: httpx.Response: Ответ от сервера.
         """
 
         url = f"{self.base_url}{endpoint}"
-        response = handle_http("DELETE", url, headers=headers, cookies=self.cookies)
+        response = self.handle_http("DELETE", url, headers=headers, cookies=cookies)
         self.log_response(response)
         return response
 

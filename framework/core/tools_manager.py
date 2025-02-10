@@ -1,4 +1,4 @@
-from typing import Dict, Type
+from typing import Dict, Type, TYPE_CHECKING
 from framework.tools.base_tools import BaseTools
 from framework.tools.pool_tools import PoolTools
 from framework.tools.disk_tools import DiskTools
@@ -6,12 +6,15 @@ from framework.tools.cluster_tools import ClusterTools
 from framework.tools.auth_tools import AuthTools
 from framework.tools.connection_tools import ConnectionTools
 
+if TYPE_CHECKING:
+    from ..core.context import TestContext
+
 
 class ToolsManager:
-    """Tools manager for test context"""
+    """Предоставляет интерфейс к набору с инструментами"""
 
-    def __init__(self, context):
-        self._context = context
+    def __init__(self, context: 'TestContext'):
+        self._context: 'TestContext' = context
         self._tools: Dict[str, BaseTools] = {}
         self._register_default_tools()
 

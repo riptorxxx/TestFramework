@@ -1,14 +1,21 @@
+import time
 import pytest
 import allure
-from framework.core.api_client import APIClient
 import os
+from framework.core.api_client import APIClient
 from dotenv import load_dotenv
 from framework.core.context import TestContext
 from framework.tools.connection_tools import ConnectionTools
+from framework.core.logger import logger
+
 
 #   Загрузка переменных окружения из .env файла. Нужно для фикстуры login.
 load_dotenv()
 
+# def pytest_runtest_setup(item):
+#     """Hook для установки текущего теста в сериализатор"""
+#     from framework.utils.serializer import Serializer
+#     Serializer.current_test = item
 
 @pytest.fixture(scope="session")
 def connection_tools():
@@ -126,19 +133,58 @@ def base_framework_context(client, base_url, request):
     yield context
 
     # Logout only after all tests complete
-    if context.tools_manager.auth.is_authenticated:
-        context.tools_manager.auth.logout()
-
+    if context.tools_manager.auth.is_authenticated():
+        context.tools_manager.auth.logout_and_clean()
 
 @pytest.fixture(scope="function")
 def framework_context(base_framework_context, request):
-    """Pass request object to maintain test parameters"""
+    """Context with authentication"""
     base_framework_context.request = request
-    if not base_framework_context.tools_manager.auth.is_authenticated():
-        base_framework_context.tools_manager.auth.configure()
-        base_framework_context.tools_manager.auth.login()
-
+    base_framework_context.tools_manager.auth.authentication()
+    logger.info(f"I call auth in fixture")
     return base_framework_context
+
+
+#
+# # Фикстура для задержки между сценариями в @pytest.mark.parametrize (проверка refresh_token)
+# @pytest.fixture(autouse=True)
+# def test_delay(request):
+#     yield
+#     # Проверяем, есть ли следующий тест в параметризации
+#     if request.node.get_closest_marker('parametrize'):
+#         time.sleep(180)  # 3 minutes
+
+
+
+# @pytest.fixture(scope="session")
+# def framework_context(base_framework_context, request):
+#     """Pass request object to maintain test parameters"""
+#     base_framework_context.request = request
+#
+#     # Auto authentication on context creation
+#     auth_tool = base_framework_context.tools_manager.auth
+#     auth_tool.configure()
+#
+#     if not auth_tool.is_authenticated():
+#         response = auth_tool.login().json()
+#     else:
+#         response = auth_tool.get_current_session()
+#
+#     # Store auth response in context for later use
+#     base_framework_context.auth_response = response
+#
+#     return base_framework_context
+
+# @pytest.fixture(scope="session")
+# def framework_context(base_framework_context, request):
+#     """Pass request object to maintain test parameters"""
+#     base_framework_context.request = request
+#     if not base_framework_context.tools_manager.auth.is_authenticated():
+#         base_framework_context.tools_manager.auth.configure()
+#         base_framework_context.tools_manager.auth.login()
+#
+#     return base_framework_context
+
 
 # @pytest.fixture
 # def framework_context(client, base_url, request):
@@ -151,41 +197,3 @@ def framework_context(base_framework_context, request):
 #         base_url=base_url,
 #         request=request
 #     )
-
-
-
-# @pytest.fixture(scope="function")
-# def test_context(request, client, base_url, request_params, cluster_info, keys_to_extract, delete_pool, logout):
-#     """
-#     Фикстура для создания экземпляра `TestContext`.
-#
-#     Эта фикстура принимает в качестве аргументов другие фикстуры (включая стандартный
-#     `request` pytest) и возвращает нужный контекст в зависимости от класса теста.
-#
-#     :param request: Объект запроса pytest.
-#     :param client: API клиент для выполнения запросов.
-#     :param base_url: Базовый URL для API.
-#     :param request_params: (dict): Параметры запроса, включая заголовки.
-#     :param cluster_info: (dict): Информация о кластере, полученная из фикстуры cluster_info.
-#     :param keys_to_extract: (list): Ключи для извлечения данных из cluster_info.
-#     :param delete_pool: Фикстура для удаления пула.
-#     :param logout: Фикстура для выполнения выхода из системы.
-#     :return: TestContext: Экземпляр `TestContext`, настроенный в зависимости от класса теста.
-#     :raises ValueError: Если класс теста неизвестен или не поддерживается.
-#     """
-#     test_class = request.node.parent
-#
-#     if ((test_class is not None and test_class.name == "TestPools") or
-#             (test_class is not None and test_class.name == "TestPoolsNegative")):
-#         return TestContext(
-#             client,
-#             base_url,
-#             request_params,
-#             cluster_info,
-#             keys_to_extract,
-#             delete_pool,
-#             logout,
-#             request
-#         )
-#     else:
-#         raise ValueError(f"Unknown test class: {getattr(request.node, 'cls', None)}")

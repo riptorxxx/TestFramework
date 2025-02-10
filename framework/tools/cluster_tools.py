@@ -1,6 +1,6 @@
 from abc import ABC
 from framework.tools.base_tools import BaseTools
-from framework.helpers.extractors import TestExtractor
+from framework.utils.extractors import TestExtractor
 
 
 class ClusterTools(BaseTools):
@@ -14,7 +14,7 @@ class ClusterTools(BaseTools):
         response = self._context.client.get("/nodes/clusterInfo")
         assert response.status_code == 200
         data = response.json()
-        print(f"DEBUG: Raw cluster info: {data}")
+        # print(f"DEBUG: Raw cluster info: {data}")
         return TestExtractor().extract_cluster_info(data, keys_to_extract)
 
         # if keys_to_extract:
