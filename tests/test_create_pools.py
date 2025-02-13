@@ -16,7 +16,7 @@ class TestCreatePools:
             mainDisksCount=2,
             mainGroupsCount=1,
             mainDisksType=DiskType.SSD,
-            mainDisksSize=536870912000,
+            # mainDisksSize=322122547200,
             wrCacheDiskCount=2,
             wrcDiskType=DiskType.SSD,
             # wrcDiskSize=536870912000,

@@ -1,84 +1,188 @@
-from typing import List, Dict, Optional
-from .base import DiskSelectionStrategy
-from framework.models.disk_models import ClusterDisks, DiskSelection
+'''
+Определяет логику выбора конкретных дисков для пула
+Выбирает оптимальные группы дисков по заданным критериям
+Распределяет диски по ролям (main, spare, wrc, rdc)
+Обновляет конфигурацию пула размерами выбранных дисков
+Отслеживает уже использованные диски
+Обеспечивает потокобезопасность при выборе дисков
+отвечает на вопрос: "КАК выбрать" (логика выбора)
+'''
+from typing import Set, Dict, Tuple
+from framework.models.disk_models import DiskSelection, ClusterDisks, DiskType
 from framework.models.pool_models import PoolConfig
 from framework.core.logger import logger
+from .base import DiskSelectionStrategy
 
 
 class AutoConfigureStrategy(DiskSelectionStrategy):
-    def _select_disks_impl(self, cluster_disks: ClusterDisks, pool_config: PoolConfig) -> tuple[DiskSelection, dict]:
-        logger.debug(f"Starting auto disk selection for config: {pool_config}")
-        selection = DiskSelection(set(), set(), set(), set())
-        used_disks = set()
-        sizes = {}
+    """Стратегия автоматического выбора дисков"""
 
-        # Выбираем main диски
-        total_main_disks = pool_config.mainDisksCount * pool_config.mainGroupsCount
-        main_result = self._disk_selector.select_main_disks(
-            cluster_disks,
-            total_main_disks,
-            used_disks,
-            disk_type=pool_config.mainDisksType,
+
+    def _select_disks_impl(self, cluster_disks: ClusterDisks, pool_config: PoolConfig) -> DiskSelection:
+        # Создание объекта выбранных дисков
+        selection = DiskSelection(set(), set(), set(), set())
+
+        # Блокировка для обеспечения потокобезопасности
+        with self._lock:
+            # Выбор основных дисков
+            self._select_main_disks(cluster_disks, pool_config, selection)
+
+            # Выбор запасных дисков
+            self._select_spare_disks(cluster_disks, pool_config, selection)
+
+            # Выбор write cache дисков
+            if pool_config.wrCacheDiskCount:
+                self._select_wrc_disks(cluster_disks, pool_config, selection)
+
+            # Выбор read cache дисков
+            if pool_config.rdCacheDiskCount:
+                self._select_rdc_disks(cluster_disks, pool_config, selection)
+
+            # Логирование результатов
+            # self._log_selection_results(selection)
+
+            return selection
+
+    def _select_main_disks(self, cluster_disks: ClusterDisks, pool_config: PoolConfig,
+                           selection: DiskSelection) -> None:
+        disk_group = self._select_disk_group(
+            cluster_disks=cluster_disks,
+            disk_type=DiskType(pool_config.mainDisksType) if pool_config.mainDisksType else None,
             disk_size=pool_config.mainDisksSize,
-            priority_type="SSD" if pool_config.perfomance_type == 0 else None
+            count=pool_config.mainDisksCount
         )
 
-        if main_result['disks']:
-            selection.main_disks = set(main_result['disks'])
-            pool_config.mainDisksSize = main_result['size']
-            sizes['main'] = main_result['size']
-            used_disks.update(main_result['disks'])
-            logger.debug(f"Selected main disks: {main_result['disks']}")
+        selection.main_disks = disk_group['disks']
+        pool_config.mainDisksSize = disk_group['size']
+        pool_config.mainDisksType = disk_group['type']
+        self._used_disks.update(disk_group['disks'])
 
-        # Выбираем WRC диски
-        if pool_config.wrCacheDiskCount:
-            wrc_disks, wrc_size = self._disk_selector.select_write_cache_disks(
-                cluster_disks,
-                pool_config.wrCacheDiskCount,
-                used_disks,
-                disk_size=pool_config.wrcDiskSize
-            )
-            if wrc_disks:
-                selection.wrc_disks = set(wrc_disks)
-                pool_config.wrcDiskSize = wrc_size
-                sizes['wrc'] = wrc_size
-                used_disks.update(wrc_disks)
-                logger.debug(f"Selected WRC disks: {wrc_disks}")
+    # диски должны быть идентичны main дискам.
+    def _select_spare_disks(self, cluster_disks: ClusterDisks, pool_config: PoolConfig,
+                            selection: DiskSelection) -> None:
+        if not pool_config.spareCacheDiskCount:
+            return
 
-        # Выбираем RDC диски
-        if pool_config.rdCacheDiskCount:
-            rdc_disks, rdc_size = self._disk_selector.select_read_cache_disks(
-                cluster_disks,
-                pool_config.rdCacheDiskCount,
-                used_disks,
-                disk_size=pool_config.rdcDiskSize
-            )
-            if rdc_disks:
-                selection.rdc_disks = set(rdc_disks)
-                pool_config.rdcDiskSize = rdc_size
-                sizes['rdc'] = rdc_size
-                used_disks.update(rdc_disks)
-                logger.debug(f"Selected RDC disks: {rdc_disks}")
+        disk_group = self._select_disk_group(
+            cluster_disks=cluster_disks,
+            disk_type=DiskType(pool_config.mainDisksType) if pool_config.mainDisksType else None,
+            disk_size=pool_config.mainDisksSize,
+            count=pool_config.spareCacheDiskCount
+        )
 
-        # Выбираем spare диски
-        if pool_config.spareCacheDiskCount and selection.main_disks:
-            required_size = pool_config.spareDiskSize or sizes.get('main')
-            spare_disks = self._disk_selector.select_spare_disks(
-                cluster_disks,
-                pool_config.spareCacheDiskCount,
-                required_size,
-                pool_config.spareDiskType or main_result['type'],
-                used_disks
-            )
-            if spare_disks:
-                selection.spare_disks = set(spare_disks)
-                pool_config.spareDiskSize = required_size
-                sizes['spare'] = required_size
-                logger.debug(f"Selected spare disks: {spare_disks}")
+        selection.spare_disks = disk_group['disks']
+        pool_config.spareDiskSize = disk_group['size']
+        self._used_disks.update(disk_group['disks'])
 
-        logger.debug(f"Final disk selection: {selection}")
-        logger.debug(f"Final disk sizes: {sizes}")
-        return selection, sizes
+    def _select_wrc_disks(self, cluster_disks: ClusterDisks, pool_config: PoolConfig,
+                          selection: DiskSelection) -> None:
+        # Выбор write cache дисков
+        wrc_group = self._select_disk_group(
+            cluster_disks=cluster_disks,
+            count=pool_config.wrCacheDiskCount,
+            disk_type=DiskType.SSD,
+            for_cache=True
+        )
+
+        selection.wrc_disks = wrc_group['disks']
+        pool_config.wrcDiskSize = wrc_group['size']
+        self._used_disks.update(wrc_group['disks'])
+
+
+    def _select_rdc_disks(self, cluster_disks: ClusterDisks, pool_config: PoolConfig,
+                          selection: DiskSelection) -> None:
+        # Выбор read cache дисков
+        rdc_group = self._select_disk_group(
+            cluster_disks=cluster_disks,
+            count=pool_config.rdCacheDiskCount,
+            disk_type=DiskType.SSD
+        )
+        selection.rdc_disks = rdc_group['disks']
+        pool_config.rdcDiskSize = rdc_group['size']
+        self._used_disks.update(rdc_group['disks'])
+
+
+    # from typing import List, Dict, Optional
+# from .base import DiskSelectionStrategy
+# from framework.models.disk_models import ClusterDisks, DiskSelection
+# from framework.models.pool_models import PoolConfig
+# from framework.core.logger import logger
+#
+#
+# class AutoConfigureStrategy(DiskSelectionStrategy):
+#     def _select_disks_impl(self, cluster_disks: ClusterDisks, pool_config: PoolConfig) -> tuple[DiskSelection, dict]:
+#         logger.debug(f"Starting auto disk selection for config: {pool_config}")
+#         selection = DiskSelection(set(), set(), set(), set())
+#         used_disks = set()
+#         sizes = {}
+#
+#         # Выбираем main диски
+#         total_main_disks = pool_config.mainDisksCount * pool_config.mainGroupsCount
+#         main_result = self._disk_selector.select_main_disks(
+#             cluster_disks,
+#             total_main_disks,
+#             used_disks,
+#             disk_type=pool_config.mainDisksType,
+#             disk_size=pool_config.mainDisksSize,
+#             priority_type="SSD" if pool_config.perfomance_type == 0 else None
+#         )
+#
+#         if main_result['disks']:
+#             selection.main_disks = set(main_result['disks'])
+#             pool_config.mainDisksSize = main_result['size']
+#             sizes['main'] = main_result['size']
+#             used_disks.update(main_result['disks'])
+#             logger.debug(f"Selected main disks: {main_result['disks']}")
+#
+#         # Выбираем WRC диски
+#         if pool_config.wrCacheDiskCount:
+#             wrc_disks, wrc_size = self._disk_selector.select_write_cache_disks(
+#                 cluster_disks,
+#                 pool_config.wrCacheDiskCount,
+#                 used_disks,
+#                 disk_size=pool_config.wrcDiskSize
+#             )
+#             if wrc_disks:
+#                 selection.wrc_disks = set(wrc_disks)
+#                 pool_config.wrcDiskSize = wrc_size
+#                 sizes['wrc'] = wrc_size
+#                 used_disks.update(wrc_disks)
+#                 logger.debug(f"Selected WRC disks: {wrc_disks}")
+#
+#         # Выбираем RDC диски
+#         if pool_config.rdCacheDiskCount:
+#             rdc_disks, rdc_size = self._disk_selector.select_read_cache_disks(
+#                 cluster_disks,
+#                 pool_config.rdCacheDiskCount,
+#                 used_disks,
+#                 disk_size=pool_config.rdcDiskSize
+#             )
+#             if rdc_disks:
+#                 selection.rdc_disks = set(rdc_disks)
+#                 pool_config.rdcDiskSize = rdc_size
+#                 sizes['rdc'] = rdc_size
+#                 used_disks.update(rdc_disks)
+#                 logger.debug(f"Selected RDC disks: {rdc_disks}")
+#
+#         # Выбираем spare диски
+#         if pool_config.spareCacheDiskCount and selection.main_disks:
+#             required_size = pool_config.spareDiskSize or sizes.get('main')
+#             spare_disks = self._disk_selector.select_spare_disks(
+#                 cluster_disks,
+#                 pool_config.spareCacheDiskCount,
+#                 required_size,
+#                 pool_config.spareDiskType or main_result['type'],
+#                 used_disks
+#             )
+#             if spare_disks:
+#                 selection.spare_disks = set(spare_disks)
+#                 pool_config.spareDiskSize = required_size
+#                 sizes['spare'] = required_size
+#                 logger.debug(f"Selected spare disks: {spare_disks}")
+#
+#         logger.debug(f"Final disk selection: {selection}")
+#         logger.debug(f"Final disk sizes: {sizes}")
+#         return selection, sizes
 
 
 
@@ -154,25 +258,26 @@ class AutoConfigureStrategy(DiskSelectionStrategy):
     #
     #     return selection, sizes
 
-    def _get_disk_size_for_type(self, cluster_disks: ClusterDisks, disk_type: str, required_count: int) -> Optional[
-        int]:
-        """Определяет оптимальный размер для заданного типа и количества дисков"""
-        type_disks = cluster_disks.get_disks_by_type(disk_type)
-        if not type_disks:
-            return None
-
-        # Группируем диски по размеру и подсчитываем количество
-        size_counts = {}
-        for disk in type_disks:
-            size = cluster_disks.disks_info[disk]['size']
-            size_counts[size] = size_counts.get(size, 0) + 1
-
-        # Выбираем наименьший размер, для которого есть достаточное количество дисков
-        for size in sorted(size_counts.keys()):
-            if size_counts[size] >= required_count:
-                return size
-
-        return None
+    # _________________________________________________________________________________________________
+    # def _get_disk_size_for_type(self, cluster_disks: ClusterDisks, disk_type: str, required_count: int) -> Optional[
+    #     int]:
+    #     """Определяет оптимальный размер для заданного типа и количества дисков"""
+    #     type_disks = cluster_disks.get_disks_by_type(disk_type)
+    #     if not type_disks:
+    #         return None
+    #
+    #     # Группируем диски по размеру и подсчитываем количество
+    #     size_counts = {}
+    #     for disk in type_disks:
+    #         size = cluster_disks.disks_info[disk]['size']
+    #         size_counts[size] = size_counts.get(size, 0) + 1
+    #
+    #     # Выбираем наименьший размер, для которого есть достаточное количество дисков
+    #     for size in sorted(size_counts.keys()):
+    #         if size_counts[size] >= required_count:
+    #             return size
+    #
+    #     return None
 
 
 
