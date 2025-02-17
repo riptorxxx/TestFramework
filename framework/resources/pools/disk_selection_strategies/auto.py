@@ -43,6 +43,7 @@ class AutoConfigureStrategy(DiskSelectionStrategy):
 
             return selection
 
+    # Выбор основных дисков
     def _select_main_disks(self, cluster_disks: ClusterDisks, pool_config: PoolConfig,
                            selection: DiskSelection) -> None:
         disk_group = self._select_disk_group(
@@ -57,7 +58,7 @@ class AutoConfigureStrategy(DiskSelectionStrategy):
         pool_config.mainDisksType = disk_group['type']
         self._used_disks.update(disk_group['disks'])
 
-    # диски должны быть идентичны main дискам.
+    # Выбор spare дисков. Диски должны быть идентичны main дискам.
     def _select_spare_disks(self, cluster_disks: ClusterDisks, pool_config: PoolConfig,
                             selection: DiskSelection) -> None:
         if not pool_config.spareCacheDiskCount:
@@ -65,12 +66,13 @@ class AutoConfigureStrategy(DiskSelectionStrategy):
 
         disk_group = self._select_disk_group(
             cluster_disks=cluster_disks,
-            disk_type=DiskType(pool_config.mainDisksType) if pool_config.mainDisksType else None,
+            disk_type=pool_config.spareDiskType if hasattr(pool_config, 'spareDiskType') else pool_config.mainDisksType,
             disk_size=pool_config.mainDisksSize,
             count=pool_config.spareCacheDiskCount
         )
 
         selection.spare_disks = disk_group['disks']
+        pool_config.spareDiskType = disk_group['type']
         pool_config.spareDiskSize = disk_group['size']
         self._used_disks.update(disk_group['disks'])
 
@@ -80,11 +82,12 @@ class AutoConfigureStrategy(DiskSelectionStrategy):
         wrc_group = self._select_disk_group(
             cluster_disks=cluster_disks,
             count=pool_config.wrCacheDiskCount,
-            disk_type=DiskType.SSD,
+            disk_type=pool_config.wrcDiskType if hasattr(pool_config, 'wrcDiskType') else DiskType.SSD,
             for_cache=True
         )
 
         selection.wrc_disks = wrc_group['disks']
+        pool_config.wrcDiskType = wrc_group['type']
         pool_config.wrcDiskSize = wrc_group['size']
         self._used_disks.update(wrc_group['disks'])
 
@@ -95,9 +98,10 @@ class AutoConfigureStrategy(DiskSelectionStrategy):
         rdc_group = self._select_disk_group(
             cluster_disks=cluster_disks,
             count=pool_config.rdCacheDiskCount,
-            disk_type=DiskType.SSD
+            disk_type=pool_config.rdcDiskType if hasattr(pool_config, 'rdcDiskType') else DiskType.SSD,
         )
         selection.rdc_disks = rdc_group['disks']
+        pool_config.rdcDiskType = rdc_group['type']
         pool_config.rdcDiskSize = rdc_group['size']
         self._used_disks.update(rdc_group['disks'])
 

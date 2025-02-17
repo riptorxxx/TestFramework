@@ -13,18 +13,19 @@ class TestCreatePools:
     @pytest.mark.parametrize("pool_config", [
         PoolConfig(
             raid_type="raid1",
+            perfomance_type=1,
             mainDisksCount=2,
             mainGroupsCount=1,
-            mainDisksType=DiskType.SSD,
+            # mainDisksType=DiskType.SSD,
             # mainDisksSize=322122547200,
             wrCacheDiskCount=2,
-            wrcDiskType=DiskType.SSD,
+            # wrcDiskType=DiskType.SSD,
             # wrcDiskSize=536870912000,
             spareCacheDiskCount=2,
-            spareDiskType=DiskType.SSD,
+            # spareDiskType=DiskType.SSD,
             # spareDiskSize=
             rdCacheDiskCount=2,
-            rdcDiskType=DiskType.SSD,
+            # rdcDiskType=DiskType.SSD,
             # rdcDiskSize=322122547200,
             auto_configure=True
         ),
