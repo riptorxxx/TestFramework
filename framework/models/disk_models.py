@@ -72,26 +72,26 @@ class ClusterDisks:
     free_for_wc: List[str]  # Список дисков доступных для write cache
     free_disks_by_size_and_type: Dict[tuple, List[str]]
 
-    def get_disks_by_type(self, disk_type: str) -> List[str]:
-        """Получение списка дисков определенного типа"""
-        return [
-            disk_id for disk_id in self.free_disks
-            if self.disks_info[disk_id]['type'] == disk_type
-        ]
-
-    def get_disks_by_size(self, size: int) -> List[str]:
-        """Получение списка дисков определенного размера"""
-        return [
-            disk_id for disk_id in self.free_disks
-            if self.disks_info[disk_id]['size'] == size
-        ]
-
-    @property
-    def available_disks(self) -> Dict[str, dict]:
-        return {
-            name: disk for name, disk in self.disks.items()
-            if not disk['pools'] and not disk['damaged'] and not disk['removed']
-        }
+    # def get_disks_by_type(self, disk_type: str) -> List[str]:
+    #     """Получение списка дисков определенного типа"""
+    #     return [
+    #         disk_id for disk_id in self.free_disks
+    #         if self.disks_info[disk_id]['type'] == disk_type
+    #     ]
+    #
+    # def get_disks_by_size(self, size: int) -> List[str]:
+    #     """Получение списка дисков определенного размера"""
+    #     return [
+    #         disk_id for disk_id in self.free_disks
+    #         if self.disks_info[disk_id]['size'] == size
+    #     ]
+    #
+    # @property
+    # def available_disks(self) -> Dict[str, dict]:
+    #     return {
+    #         name: disk for name, disk in self.disks.items()
+    #         if not disk['pools'] and not disk['damaged'] and not disk['removed']
+    #     }
 
 
 #
@@ -132,13 +132,6 @@ class ClusterDisks:
 #     path_count: int
 #     partition_count: int
 #     partitions: List[DiskPartition] = field(default_factory=list)
-
-# @dataclass
-# class DiskSelection:
-#     main_disks: List[DiskInfo]
-#     spare_disks: Optional[List[DiskInfo]] = None
-#     wrc_disks: Optional[List[DiskInfo]] = None
-#     rdc_disks: Optional[List[DiskInfo]] = None
 
 
 # @dataclass

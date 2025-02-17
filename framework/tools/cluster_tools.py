@@ -14,7 +14,7 @@ class ClusterTools(BaseTools):
         response = self._context.client.get("/nodes/clusterInfo")
         assert response.status_code == 200
         data = response.json()
-        # print(f"DEBUG: Raw cluster info: {data}")
+        # print(f"DEBUG: cluster info: {data}")
         return TestExtractor().extract_cluster_info(data, keys_to_extract)
 
         # if keys_to_extract:

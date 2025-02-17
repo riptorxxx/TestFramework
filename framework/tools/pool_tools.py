@@ -10,7 +10,6 @@ from ..utils.test_params import get_test_params
 from httpx import Response
 
 
-
 class PoolTools(BaseTools):
     def __init__(self, context):
         super().__init__(context)
@@ -19,18 +18,18 @@ class PoolTools(BaseTools):
         self._pool_names: List[str] = []
         self._disk_selector = DiskSelector(self)
 
-
     def configure(self, config: Union[PoolConfig, dict]):
         if isinstance(config, PoolConfig):
             config = config.__dict__
         self._config = PoolConfig(**config)
 
     def validate(self):
-        """Validate cluster state before pool operations"""
+        """валидируем состояние кластера перед началом работ с пулом"""
         self._context.tools_manager.cluster.validate()
 
     @disk_operation_with_retry()
     def create(self, **custom_params) -> dict:
+        """Основной метод создания пула"""
         self.validate()
         # Формирует словарь с параметрами запроса
         request_data = self._prepare_request_data()
@@ -50,6 +49,7 @@ class PoolTools(BaseTools):
         return response_data
 
     def _prepare_request_data(self) -> dict:
+        """Подготавливаем запрос на создание пула"""
         if not self._config:
             self._config = PoolConfig()
 
@@ -65,35 +65,12 @@ class PoolTools(BaseTools):
 
         return request_data
 
-    # def _prepare_request_data(self) -> dict:
-    #     if not self._config:
-    #         self._config = PoolConfig()
-    #
-    #     cluster_data = self._context.tools_manager.cluster.get_cluster_info(
-    #         keys_to_extract=["name"]
-    #     )
-    #
-    #     # Стратегия сама определит что делать на основе auto_configure
-    #     disk_config = self._disk_selector.select_disks(
-    #         cluster_data,
-    #         self._config
-    #     )
-    #
-    #     request_data = self._config.to_request()
-    #     request_data.update(self._get_dynamic_params())
-    #
-    #     # Для manual режима добавляем выбранные диски в запрос
-    #     if not self._config.auto_configure:
-    #         request_data.update(disk_config)
-    #
-    #     return request_data
-
     def _generate_pool_name(self) -> str:
-        """Generate unique pool name"""
+        """Создаём уникальное имя для пула"""
         return f"{Generates.random_string(8)}"
 
     def _get_dynamic_params(self) -> dict:
-        # Gets node number from already configured connection
+        """Получаем динамические параметры для конфига пула"""
         current_node = self._context.tools_manager.connection.get_current_config()
         node_number = int(current_node.node.replace('NODE_', '')) if current_node else 1
         return {
@@ -112,20 +89,8 @@ class PoolTools(BaseTools):
             self._config
         )
 
-    # def _get_disk_configuration(self) -> dict:
-    #     """Get disk configuration using cluster data"""
-    #     cluster_data = self._context.tools_manager.cluster.get_cluster_info(
-    #         keys_to_extract=["name"]  # Используем базовый набор ключей
-    #     )
-    #
-    #     return self._disk_selector.select_disks(
-    #         cluster_data['free_disks'],
-    #         cluster_data['disks_info'],
-    #         self._config
-    #     )
-
     def _make_request(self, request_data: Dict) -> Response:
-        """Make API request using context client"""
+        """Создаём API запрос используя клиент из контекста"""
         return self._context.client.post(
             f"/pools/{request_data['name']}",
             json=request_data

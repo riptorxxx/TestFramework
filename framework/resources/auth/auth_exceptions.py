@@ -1,5 +1,5 @@
 class AuthenticationError(Exception):
-    """Custom exception for authentication-related errors"""
+    """Custom exception for authentication errors"""
 
     def __init__(self, message: str, status_code: int = None, response_data: dict = None):
         self.message = message

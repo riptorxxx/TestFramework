@@ -1,7 +1,5 @@
 import pytest
-from typing import Dict
 from framework.models.pool_models import PoolConfig
-from framework.models.disk_models import DiskType, DiskSelection
 
 
 class TestCreatePools:
@@ -29,18 +27,6 @@ class TestCreatePools:
             # rdcDiskSize=322122547200,
             auto_configure=True
         ),
-        # PoolConfig(
-        #     raid_type="raid5",
-        #     mainDisksCount=4,
-        #     mainGroupsCount=1,
-        #     mainDisksType=DiskType.SSD,
-        #     wrCacheDiskCount=2,
-        #     wrcDiskType=DiskType.SSD,
-        #     wrcDiskSize=536870912000,
-        #     # rdcDisks=2,
-        #     # rdcDiskType=DiskType.SSD,
-        #     auto_configure=True
-        # )
     ])
     def test_create_pool(self, framework_context, pool_config, keys_to_extract):
         # auth_tools = framework_context.tools_manager.auth
@@ -64,13 +50,44 @@ class TestCreatePools:
     @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
     @pytest.mark.parametrize("keys_to_extract", [["name"]])
     @pytest.mark.parametrize("pool_config", [
+        PoolConfig(
+            raid_type="raid1",
+            perfomance_type=0,
+            mainDisksCount=2,
+            mainGroupsCount=1,
+            # mainDisksType=DiskType.SSD,
+            # mainDisksSize=322122547200,
+            spareCacheDiskCount=2,
+            # spareDiskType=DiskType.SSD,
+            # spareDiskSize=
+            auto_configure=True
+        ),
+    ])
+    def test_create_lvm_auto_pool(self, framework_context, pool_config, keys_to_extract):
+        pool_tools = framework_context.tools_manager.pool
+        pool_tools.configure(pool_config)
+        response = pool_tools.create()
+
+        # Проверяем успешное создание пула
+        assert response['status'] == "created"
+
+        # Проверяем что пул сохранился в current_pool
+        assert pool_tools.current_pool is not None
+        assert pool_tools.current_pool['name'] in pool_tools._pool_names
+        pool_tools.cleanup()
+
+
+    @pytest.mark.nc
+    @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
+    @pytest.mark.parametrize("keys_to_extract", [["name"]])
+    @pytest.mark.parametrize("pool_config", [
         PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=0, spareDisks=0),
         PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=0, spareDisks=0),
         PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=1, spareDisks=0),
         PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=0, spareDisks=1),
         PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=2, spareDisks=2),
     ])
-    def test_create_zfc_raid1_pool(self, framework_context, pool_config, keys_to_extract):
+    def test_create_zfs_pool_manual_raid1(self, framework_context, pool_config, keys_to_extract):
         pool_tools = framework_context.tools_manager.pool
         pool_tools.configure(pool_config)
         response = pool_tools.create()
@@ -93,7 +110,7 @@ class TestCreatePools:
         PoolConfig(auto_configure=False, raid_type="raid5", mainDisks=3, wrcDisks=0, rdcDisks=0, spareDisks=1),
         PoolConfig(auto_configure=False, raid_type="raid5", mainDisks=3, wrcDisks=2, rdcDisks=2, spareDisks=2),
     ])
-    def test_create_zfc_raid5_pool(self, framework_context, pool_config, keys_to_extract):
+    def test_create_zfs_pool_manual_raid5(self, framework_context, pool_config, keys_to_extract):
         pool_tools = framework_context.tools_manager.pool
         pool_tools.configure(pool_config)
         response = pool_tools.create()
@@ -117,7 +134,7 @@ class TestCreatePools:
         PoolConfig(auto_configure=False, raid_type="raid6", mainDisks=4, wrcDisks=0, rdcDisks=0, spareDisks=1),
         PoolConfig(auto_configure=False, raid_type="raid6", mainDisks=4, wrcDisks=2, rdcDisks=2, spareDisks=2),
     ])
-    def test_create_zfc_raid6_pool(self, framework_context, pool_config, keys_to_extract):
+    def test_create_zfs_pool_manual_raid6(self, framework_context, pool_config, keys_to_extract):
         pool_tools = framework_context.tools_manager.pool
         pool_tools.configure(pool_config)
         response = pool_tools.create()
@@ -141,7 +158,7 @@ class TestCreatePools:
         PoolConfig(auto_configure=False, raid_type="raid7", mainDisks=5, wrcDisks=0, rdcDisks=0, spareDisks=1),
         PoolConfig(auto_configure=False, raid_type="raid7", mainDisks=5, wrcDisks=2, rdcDisks=2, spareDisks=2),
     ])
-    def test_create_zfc_raidb3_pool(self, framework_context, pool_config, keys_to_extract):
+    def test_create_zfs_pool_manual_raidb3(self, framework_context, pool_config, keys_to_extract):
         pool_tools = framework_context.tools_manager.pool
         pool_tools.configure(pool_config)
         response = pool_tools.create()
@@ -163,7 +180,7 @@ class TestCreatePools:
         PoolConfig(auto_configure=False, raid_type="raid1", perfomance_type=0, mainDisks=2, spareDisks=1),
         # PoolConfig(raid_type="raid1", perfomance_type=0, mainDisks=2, spareDisks=2),
     ])
-    def test_create_lvm_raid1_pool(self, framework_context, pool_config, keys_to_extract):
+    def test_create_lvm_pool_manual_raid1(self, framework_context, pool_config, keys_to_extract):
         pool_tools = framework_context.tools_manager.pool
         pool_tools.configure(pool_config)
         response = pool_tools.create()

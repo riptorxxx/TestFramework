@@ -1,6 +1,4 @@
-import time
 import pytest
-import allure
 import os
 from framework.core.api_client import APIClient
 from dotenv import load_dotenv
@@ -9,7 +7,7 @@ from framework.tools.connection_tools import ConnectionTools
 from framework.core.logger import logger
 
 
-#   Загрузка переменных окружения из .env файла. Нужно для фикстуры login.
+#   Загрузка переменных окружения из .env файла. Нужно для переключения между нодами.
 load_dotenv()
 
 # def pytest_runtest_setup(item):
@@ -141,59 +139,5 @@ def framework_context(base_framework_context, request):
     """Context with authentication"""
     base_framework_context.request = request
     base_framework_context.tools_manager.auth.authentication()
-    logger.info(f"I call auth in fixture")
+
     return base_framework_context
-
-
-#
-# # Фикстура для задержки между сценариями в @pytest.mark.parametrize (проверка refresh_token)
-# @pytest.fixture(autouse=True)
-# def test_delay(request):
-#     yield
-#     # Проверяем, есть ли следующий тест в параметризации
-#     if request.node.get_closest_marker('parametrize'):
-#         time.sleep(180)  # 3 minutes
-
-
-
-# @pytest.fixture(scope="session")
-# def framework_context(base_framework_context, request):
-#     """Pass request object to maintain test parameters"""
-#     base_framework_context.request = request
-#
-#     # Auto authentication on context creation
-#     auth_tool = base_framework_context.tools_manager.auth
-#     auth_tool.configure()
-#
-#     if not auth_tool.is_authenticated():
-#         response = auth_tool.login().json()
-#     else:
-#         response = auth_tool.get_current_session()
-#
-#     # Store auth response in context for later use
-#     base_framework_context.auth_response = response
-#
-#     return base_framework_context
-
-# @pytest.fixture(scope="session")
-# def framework_context(base_framework_context, request):
-#     """Pass request object to maintain test parameters"""
-#     base_framework_context.request = request
-#     if not base_framework_context.tools_manager.auth.is_authenticated():
-#         base_framework_context.tools_manager.auth.configure()
-#         base_framework_context.tools_manager.auth.login()
-#
-#     return base_framework_context
-
-
-# @pytest.fixture
-# def framework_context(client, base_url, request):
-#     """
-#         Создаёт тестовый контекст. Обеспечивает точку входа
-#         для всех инструментов тестирования через ToolsManager
-#     """
-#     return TestContext(
-#         client=client,
-#         base_url=base_url,
-#         request=request
-#     )
