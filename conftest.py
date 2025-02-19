@@ -109,17 +109,6 @@ def client(base_url):
     """
     return APIClient(base_url)
 
-
-@pytest.fixture(scope="function")
-def authenticated_context(test_context):
-    connection = test_context.tools_manager.connection
-    connection.configure()
-    connection.login()
-
-    yield test_context
-
-    connection.logout()
-
 # Строчка для распаралеливания тестов. Копирует контекст независимый от другого.
 # context = copy.deepcopy(base_framework_context)
 

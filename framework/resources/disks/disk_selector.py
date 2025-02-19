@@ -25,4 +25,3 @@ class DiskSelector:
             raise ValueError(f"Strategy {name} already registered")
         self._strategies[name] = strategy_class
         logger.info(f"Registered new disk selection strategy: {name}")
-

@@ -1,8 +1,23 @@
 import pytest
+
+from framework.core.logger import logger
 from framework.models.pool_models import PoolConfig
 
 
 class TestCreatePools:
+
+
+    @pytest.mark.nc
+    @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
+    def test_get_pool(self, framework_context):
+        pool_tools = framework_context.tools_manager.pool
+        response = pool_tools.get_pools().json()
+        logger.info(response)
+        # Проверяем успешное создание пула
+        # assert response['status'] == "created"
+
+
+
 
 
     @pytest.mark.nc

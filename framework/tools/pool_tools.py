@@ -1,4 +1,5 @@
 import json
+from httpx import Response
 from typing import Dict, List, Optional, Union
 from framework.utils.generators import Generates
 from framework.utils.retry import disk_operation_with_retry
@@ -7,7 +8,7 @@ from .base_tools import BaseTools
 from ..core.logger import logger
 from ..resources.disks.disk_selector import DiskSelector
 from ..utils.test_params import get_test_params
-from httpx import Response
+from ..resources.endpoints import ApiEndpoints
 
 
 class PoolTools(BaseTools):
@@ -79,7 +80,7 @@ class PoolTools(BaseTools):
         }
 
     def _get_disk_configuration(self) -> dict:
-        """Get disk configuration using cluster data"""
+        """Получить данные от кластера, конфигурацию дисков."""
         cluster_data = self._context.tools_manager.cluster.get_cluster_info(
             keys_to_extract=["name"]
         )
@@ -90,9 +91,9 @@ class PoolTools(BaseTools):
         )
 
     def _make_request(self, request_data: Dict) -> Response:
-        """Создаём API запрос используя клиент из контекста"""
+        """Создаём API запрос на создание пула используя клиент из контекста"""
         return self._context.client.post(
-            f"/pools/{request_data['name']}",
+            ApiEndpoints.Pools.CREATE_POOL.format(pool_name=request_data['name']),
             json=request_data
         )
 
@@ -112,10 +113,11 @@ class PoolTools(BaseTools):
 
         return self.current_pool
 
-
     def delete_pool(self, pool_name: str) -> None:
         """Delete pool by name"""
-        response = self._context.client.delete(f"/pools/{pool_name}")
+        response = self._context.client.delete(
+            ApiEndpoints.Pools.DELETE_POOL.format(pool_name=pool_name)
+        )
 
         if response.status_code not in (200, 204):
             raise ValueError(f"Failed to delete pool: {response.text}")
@@ -131,3 +133,12 @@ class PoolTools(BaseTools):
         for pool_name in self._pool_names[:]:
             self.delete_pool(pool_name)
         self._pool_names.clear()
+
+    def get_pools(self):
+        return self._context.client.get(ApiEndpoints.Pools.BASE)
+
+    def expand_pool(self, pool_name: str):
+        pass
+
+    def get_pool_to_import(self):
+        pass
