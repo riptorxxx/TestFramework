@@ -4,6 +4,7 @@ class ApiEndpoints:
     class Cluster:
         BASE = "/cluster"
         STATUS = "/cluster/status"
+        CLUSTER_INFO = "/nodes/clusterInfo"
 
     class Pools:
         BASE = "/pools"                                             # Получить список пулов

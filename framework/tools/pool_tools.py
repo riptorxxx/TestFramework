@@ -3,7 +3,7 @@ from httpx import Response
 from typing import Dict, List, Optional, Union
 from framework.utils.generators import Generates
 from framework.utils.retry import disk_operation_with_retry
-from framework.models.pool_models import PoolConfig
+from framework.models.pool_models import PoolConfig, PoolData, PoolProps
 from .base_tools import BaseTools
 from ..core.logger import logger
 from ..resources.disks.disk_selector import DiskSelector
@@ -36,13 +36,15 @@ class PoolTools(BaseTools):
         request_data = self._prepare_request_data()
 
         # Отправляет POST запрос, получает объект Response
-        response = self._make_request(request_data)
+        response = self._make_create_request(request_data)
 
         # Преобразует Response в словарь:
         response_data = self._process_response(response)
 
         # Сохраняет информацию о текущем пуле в экземпляре класса
         self.current_pool = request_data
+        # current_pool содержит финальный конфиг пула который уходит в request.
+        logger.info(f"POOL => : {self.current_pool}")
 
         # Добавляет имя пула в список всех созданных пулов
         self._pool_names.append(request_data['name'])
@@ -90,7 +92,7 @@ class PoolTools(BaseTools):
             self._config
         )
 
-    def _make_request(self, request_data: Dict) -> Response:
+    def _make_create_request(self, request_data: Dict) -> Response:
         """Создаём API запрос на создание пула используя клиент из контекста"""
         return self._context.client.post(
             ApiEndpoints.Pools.CREATE_POOL.format(pool_name=request_data['name']),
@@ -137,8 +139,121 @@ class PoolTools(BaseTools):
     def get_pools(self):
         return self._context.client.get(ApiEndpoints.Pools.BASE)
 
+    def get_pool_by_name(self, pool_name: str) -> dict:
+        """Get pool configuration by name"""
+        pools = self.get_pools().json()
+        for pool in pools['pools']:
+            if pool['name'] == pool_name:
+                return pool
+        raise ValueError(f"Pool {pool_name} not found")
+
     def expand_pool(self, pool_name: str):
         pass
 
     def get_pool_to_import(self):
         pass
+
+    def _make_expansion_request(self, pool_name: str, request_data: Dict) -> Response:
+        """Send pool expansion request"""
+        return self._context.client.put(
+            ApiEndpoints.Pools.EXPAND_POOL.format(pool_name=pool_name),
+            json=request_data
+        )
+
+    # @disk_operation_with_retry()
+    # def expand_pool(self, pool_name: str = None) -> dict:
+    #     """Расширение существующего пула дополнительными дисками"""
+    #     self.validate()
+    #
+    #     pool_name = pool_name or self.current_pool['name']
+    #     pool_data = self.get_pool_by_name(pool_name)
+    #
+    #     # Преобразуем словарь в PoolData
+    #     current_pool = PoolData(
+    #         name=pool_data['name'],
+    #         type=pool_data['type'],
+    #         props=PoolProps(**pool_data['props'])
+    #     )
+    #
+    #     # Получаем диски для расширения через DiskTools
+    #     expansion_disks = self._context.tools_manager.disk.select_disks_for_expansion(current_pool)
+    #     logger.info(f"Полученные для расширения диски: {expansion_disks}")
+    #
+    #     # Отправляем запрос на расширение
+    #     response = self._make_expansion_request(
+    #         pool_name=pool_name,
+    #         request_data={"disks": list(expansion_disks['disks'])}
+    #     )
+    #
+    #     return self._process_response(response)
+
+    @disk_operation_with_retry()
+    def expand_pool(self, pool_name: str) -> Response:
+        """Расширение существующего пула"""
+        self.validate()
+
+        # Получаем текущий пул
+        pool_data = self.get_pool_by_name(pool_name)
+        # Преобразуем приходящий словарь к PoolData
+        current_pool = PoolData(
+            name=pool_data['name'],
+            type=pool_data['type'],
+            props=PoolProps(**pool_data['props'])
+        )
+
+        # Получаем диски через стратегию расширения
+        cluster_info = self._context.tools_manager.cluster.get_cluster_info()
+        expansion_disks = self._disk_selector.select_disks_for_expansion(cluster_info, current_pool)
+
+        # Преобразуем в нужный формат
+        request_data = {
+            'disks': list(expansion_disks['mainDisks'])
+        }
+
+        # Отправляем запрос на расширение
+        response = self._make_expansion_request(
+            pool_name=pool_name,
+            request_data=request_data
+        )
+
+        return response
+
+    # def get_sample_disk_from_pool(self, pool_name: str) -> str:
+    #     """
+    #     Получает диск-образец из существующего пула
+    #
+    #     Args:
+    #         pool_name: Имя пула
+    #     Returns:
+    #         str: ID диска-образца
+    #     """
+    #     pool = self._context.tools_manager.cluster.get_cluster_info()['pools'][pool_name]
+    #     return pool['main_disks'][0]  # берем первый основной диск как образец
+    #
+    # def select_disks_for_expansion(self, pool_name: str) -> List[str]:
+    #     """
+    #     Ищет диски для расширения пула
+    #
+    #     Args:
+    #         pool_name: Имя расширяемого пула
+    #     Returns:
+    #         List[str]: Список ID подходящих дисков
+    #     """
+    #     # Получаем информацию о пуле
+    #     pool = self._context.tools_manager.cluster.get_cluster_info()['pools'][pool_name]
+    #
+    #     # Количество основных дисков в пуле = количеству дисков для расширения
+    #     required_count = len(pool['main_disks'])
+    #
+    #     # Получаем диск-образец
+    #     sample_disk = self.get_sample_disk_from_pool(pool_name)
+    #
+    #     # Ищем похожие диски
+    #     cluster_info = self._context.tools_manager.cluster.get_cluster_info()
+    #     similar_disks = self._context.tools_manager.disk.find_similar_disks(
+    #         sample_disk_id=sample_disk,
+    #         search_group=cluster_info['free_disks'],
+    #         criteria=['type', 'size'],
+    #         count=required_count
+    #     )
+    #     return similar_disks

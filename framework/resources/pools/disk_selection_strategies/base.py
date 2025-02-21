@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Set, Optional, List
+from typing import Dict, Set, Optional, List, Union
 from framework.models.disk_models import DiskSelection, ClusterDisks, DiskType
-from framework.models.pool_models import PoolConfig
+from framework.models.pool_models import PoolConfig, PoolData
 from framework.core.logger import logger
 from threading import Lock
 
@@ -13,10 +13,27 @@ class DiskSelectionStrategy(ABC):
         self._used_disks = set()
         self._lock = Lock()
 
-    def select_disks(self, cluster_data: dict, pool_config: PoolConfig) -> dict:
-        self._pool_config = pool_config
+    # def select_disks(self, cluster_data: dict, pool_config: PoolConfig) -> dict:
+    #     self._pool_config = pool_config
+    #     cluster_disks = self._create_cluster_disks(cluster_data)
+    #     selection = self._select_disks_impl(cluster_disks, pool_config)
+    #     self._log_selection_results(selection)
+    #     return selection.to_dict()
+
+    # def select_disks(self, cluster_data: dict, config: Union[PoolConfig, PoolData]) -> dict:
+    #     """Base method for disk selection that accepts both PoolConfig and PoolData"""
+    #     cluster_disks = self._create_cluster_disks(cluster_data)
+    #     selection = self._select_disks_impl(cluster_disks, config)
+    #     self._log_selection_results(selection)
+    #     return selection.to_dict()
+
+    def select_disks(self, cluster_data: dict, config: Union[PoolConfig, PoolData]) -> dict:
+        """Base method for disk selection"""
         cluster_disks = self._create_cluster_disks(cluster_data)
-        selection = self._select_disks_impl(cluster_disks, pool_config)
+        # Сохраняем конфигурацию только если это PoolConfig (чтобы auto и manual использовали PoolConfig)
+        if isinstance(config, PoolConfig):
+            self._pool_config = config
+        selection = self._select_disks_impl(cluster_disks, config)
         self._log_selection_results(selection)
         return selection.to_dict()
 
@@ -101,6 +118,7 @@ class DiskSelectionStrategy(ABC):
         raise ValueError(f"Insufficient disks. Required: {count}")
 
     def _create_cluster_disks(self, cluster_data: dict) -> ClusterDisks:
+        logger.info(f"Received cluster_data: {cluster_data}")
         return ClusterDisks(
             disks_info=cluster_data['disks_info'],
             free_disks=cluster_data['free_disks'],
@@ -109,7 +127,13 @@ class DiskSelectionStrategy(ABC):
         )
 
     def _determine_priority_type(self) -> Optional[DiskType]:
+        # Проверяем отсутствие pool_config, что бы expand не проверял на perfomance==0
+        if not self._pool_config:
+            return None
         return DiskType.SSD if self._pool_config.perfomance_type == 0 else None
+
+    # def _determine_priority_type(self) -> Optional[DiskType]:
+    #     return DiskType.SSD if self._pool_config.perfomance_type == 0 else None
 
     def _log_selection_results(self, selection: DiskSelection) -> None:
         logger.info(

@@ -85,3 +85,33 @@ class PoolConfig(BaseConfig):
         }
         contract.update({k: v for k, v in manual_params.items() if v is not None})
         return contract
+
+
+@dataclass
+class PoolProps:
+    guid: str
+    status: str
+    used: str
+    free: str
+    size: str
+    disks: List[str]
+    disks_groups_count: int
+    removed_disks: List[str]
+    mode: int
+    raid: str
+    rdcache: List[str]
+    wrcache: List[str]
+    spare: List[str]
+    node: int
+    dedupratio: str
+    dataset_dedup: List[str]
+    freeing: str
+    reserved: int
+    priority: int
+    scan: Dict[str, str]
+
+@dataclass
+class PoolData:
+    name: str
+    type: str
+    props: PoolProps
