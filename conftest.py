@@ -1,11 +1,9 @@
 import pytest
 import os
-from framework.core.api_client import APIClient
+from framework.api.core.api_client import APIClient
 from dotenv import load_dotenv
-from framework.core.context import TestContext
-from framework.tools.connection_tools import ConnectionTools
-from framework.core.logger import logger
-
+from framework.api.core.context import TestContext
+from framework.api.tools.connection_tools import ConnectionTools
 
 #   Загрузка переменных окружения из .env файла. Нужно для переключения между нодами.
 load_dotenv()
