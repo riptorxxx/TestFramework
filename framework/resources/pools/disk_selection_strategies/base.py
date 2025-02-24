@@ -13,20 +13,6 @@ class DiskSelectionStrategy(ABC):
         self._used_disks = set()
         self._lock = Lock()
 
-    # def select_disks(self, cluster_data: dict, pool_config: PoolConfig) -> dict:
-    #     self._pool_config = pool_config
-    #     cluster_disks = self._create_cluster_disks(cluster_data)
-    #     selection = self._select_disks_impl(cluster_disks, pool_config)
-    #     self._log_selection_results(selection)
-    #     return selection.to_dict()
-
-    # def select_disks(self, cluster_data: dict, config: Union[PoolConfig, PoolData]) -> dict:
-    #     """Base method for disk selection that accepts both PoolConfig and PoolData"""
-    #     cluster_disks = self._create_cluster_disks(cluster_data)
-    #     selection = self._select_disks_impl(cluster_disks, config)
-    #     self._log_selection_results(selection)
-    #     return selection.to_dict()
-
     def select_disks(self, cluster_data: dict, config: Union[PoolConfig, PoolData]) -> dict:
         """Base method for disk selection"""
         cluster_disks = self._create_cluster_disks(cluster_data)
@@ -131,9 +117,6 @@ class DiskSelectionStrategy(ABC):
         if not self._pool_config:
             return None
         return DiskType.SSD if self._pool_config.perfomance_type == 0 else None
-
-    # def _determine_priority_type(self) -> Optional[DiskType]:
-    #     return DiskType.SSD if self._pool_config.perfomance_type == 0 else None
 
     def _log_selection_results(self, selection: DiskSelection) -> None:
         logger.info(

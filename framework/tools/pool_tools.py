@@ -132,8 +132,8 @@ class PoolTools(BaseTools):
 
     def cleanup(self):
         """Cleanup all created pools"""
-        for pool_name in self._pool_names[:]:
-            self.delete_pool(pool_name)
+        # for pool_name in self._pool_names[:]:
+        #     self.delete_pool(pool_name)
         self._pool_names.clear()
 
     def get_pools(self):
@@ -159,33 +159,6 @@ class PoolTools(BaseTools):
             ApiEndpoints.Pools.EXPAND_POOL.format(pool_name=pool_name),
             json=request_data
         )
-
-    # @disk_operation_with_retry()
-    # def expand_pool(self, pool_name: str = None) -> dict:
-    #     """Расширение существующего пула дополнительными дисками"""
-    #     self.validate()
-    #
-    #     pool_name = pool_name or self.current_pool['name']
-    #     pool_data = self.get_pool_by_name(pool_name)
-    #
-    #     # Преобразуем словарь в PoolData
-    #     current_pool = PoolData(
-    #         name=pool_data['name'],
-    #         type=pool_data['type'],
-    #         props=PoolProps(**pool_data['props'])
-    #     )
-    #
-    #     # Получаем диски для расширения через DiskTools
-    #     expansion_disks = self._context.tools_manager.disk.select_disks_for_expansion(current_pool)
-    #     logger.info(f"Полученные для расширения диски: {expansion_disks}")
-    #
-    #     # Отправляем запрос на расширение
-    #     response = self._make_expansion_request(
-    #         pool_name=pool_name,
-    #         request_data={"disks": list(expansion_disks['disks'])}
-    #     )
-    #
-    #     return self._process_response(response)
 
     @disk_operation_with_retry()
     def expand_pool(self, pool_name: str) -> Response:
@@ -217,43 +190,3 @@ class PoolTools(BaseTools):
         )
 
         return response
-
-    # def get_sample_disk_from_pool(self, pool_name: str) -> str:
-    #     """
-    #     Получает диск-образец из существующего пула
-    #
-    #     Args:
-    #         pool_name: Имя пула
-    #     Returns:
-    #         str: ID диска-образца
-    #     """
-    #     pool = self._context.tools_manager.cluster.get_cluster_info()['pools'][pool_name]
-    #     return pool['main_disks'][0]  # берем первый основной диск как образец
-    #
-    # def select_disks_for_expansion(self, pool_name: str) -> List[str]:
-    #     """
-    #     Ищет диски для расширения пула
-    #
-    #     Args:
-    #         pool_name: Имя расширяемого пула
-    #     Returns:
-    #         List[str]: Список ID подходящих дисков
-    #     """
-    #     # Получаем информацию о пуле
-    #     pool = self._context.tools_manager.cluster.get_cluster_info()['pools'][pool_name]
-    #
-    #     # Количество основных дисков в пуле = количеству дисков для расширения
-    #     required_count = len(pool['main_disks'])
-    #
-    #     # Получаем диск-образец
-    #     sample_disk = self.get_sample_disk_from_pool(pool_name)
-    #
-    #     # Ищем похожие диски
-    #     cluster_info = self._context.tools_manager.cluster.get_cluster_info()
-    #     similar_disks = self._context.tools_manager.disk.find_similar_disks(
-    #         sample_disk_id=sample_disk,
-    #         search_group=cluster_info['free_disks'],
-    #         criteria=['type', 'size'],
-    #         count=required_count
-    #     )
-    #     return similar_disks

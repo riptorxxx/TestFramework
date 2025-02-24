@@ -1,5 +1,4 @@
 import httpx
-import allure
 from framework.core.logger import logger
 import time
 import json
@@ -74,16 +73,6 @@ class APIClient:
     def __del__(self):
         self.http_client.close()
 
-
-    # def update_cookies(self, response):
-    #     """Update cookies from response"""
-    #     if 'Set-Cookie' in response.headers:
-    #         new_cookies = self.cookie_manager.parse_set_cookie_header(
-    #             response.headers.get_list('Set-Cookie')
-    #         )
-    #         self.cookies.update(new_cookies)
-
-
     def handle_http(self, method, url, json=None, headers=None, params=None, cookies=None):
         start_time = time.time()
 
@@ -122,24 +111,6 @@ class APIClient:
             logger.error(f"{method} request failed: {exc.response.status_code} - {exc.response.text}", exc_info=exc)
             raise
 
-
-    # def parse_cookies(self, set_cookie_header):
-    #     """
-    #     Парсит заголовок Set-Cookie и возвращает словарь с куками.
-    #
-    #     :param set_cookie_header: (str): Заголовок Set-Cookie из ответа.
-    #     :return: dict: Словарь с куками.
-    #     """
-    #
-    #     cookies = {}
-    #     for cookie in set_cookie_header.split(','):
-    #         key_value = cookie.split(';')[0].strip().split('=')
-    #         if len(key_value) == 2:
-    #             cookies[key_value[0]] = key_value[1]
-    #     return cookies
-
-
-    @allure.step("Sending GET request to {endpoint}")
     def get(self, endpoint, headers=None, params=None, cookies=None):
         """
         Выполняет GET запрос к указанному эндпоинту.
@@ -158,7 +129,7 @@ class APIClient:
         # logger.info(f"GET RESPONSE:  {response.json()}")
         return response
 
-    @allure.step("Sending POST request to {endpoint}")
+
     def post(self, endpoint, json=None, headers=None, cookies=None):
         """
         Выполняет POST запрос к указанному эндпоинту.
@@ -181,7 +152,6 @@ class APIClient:
         return response
 
 
-    @allure.step("Sending PUT request to {endpoint}")
     def put(self, endpoint, json=None, headers=None, cookies=None):
         """
         Выполняет PUT запрос к указанному эндпоинту.
@@ -199,7 +169,6 @@ class APIClient:
         return response
 
 
-    @allure.step("Sending DELETE request to {endpoint}")
     def delete(self, endpoint, headers=None, cookies=None):
         """
         Выполняет DELETE запрос к указанному эндпоинту.
@@ -217,7 +186,6 @@ class APIClient:
 
 
     @staticmethod
-    @allure.step("Logging response")
     def log_response(response):
         """
         Логирует информацию о ответе от сервера.
@@ -228,11 +196,9 @@ class APIClient:
 
         if response.status_code not in (200, 201, 204):
             logger.error(f"Error response. Status code: {response.status_code} - Body: {response.text}")
-        allure.attach(response.text, name="response_body", attachment_type=allure.attachment_type.JSON)
 
 
     @staticmethod
-    @allure.step("Logging request")
     def log_request(method, url, headers=None, params=None, json=None, cookies=None):
         """
         Логирует информацию о выполненном запросе.
@@ -251,7 +217,6 @@ class APIClient:
             logger.info("Headers:")
             for header, value in headers.items():
                 logger.info(f"  {header}: {value}")
-            allure.attach(str(headers), name="request_headers", attachment_type=allure.attachment_type.TEXT)
 
         if cookies:
             logger.info("Cookies:")
@@ -260,10 +225,8 @@ class APIClient:
 
         if params:
             logger.info(f"Params: {params}")
-            allure.attach(str(params), name="request_params", attachment_type=allure.attachment_type.TEXT)
 
         if json:
             logger.info(f"Body: {json}")
-            allure.attach(str(json), name="request_body", attachment_type=allure.attachment_type.JSON)
 
         logger.info("=====================")

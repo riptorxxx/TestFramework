@@ -19,16 +19,3 @@ class APIRequestBuilder:
             result = {k: v for k, v in public_fields.items() if v is not None}
 
         return result
-
-# class APIRequestBuilder:
-#     @staticmethod
-#     def build(data_object: Any, mapping: Dict[str, str] = None) -> dict:
-#         base_dict = asdict(data_object)
-#         result = {}
-#         if mapping:
-#             for src_field, api_field in mapping.items():
-#                 if src_field in base_dict and base_dict[src_field] is not None:
-#                     result[api_field] = base_dict[src_field]
-#         else:
-#             result = {k: v for k, v in base_dict.items() if v is not None}
-#         return result

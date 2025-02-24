@@ -25,20 +25,6 @@ class ClusterTools(BaseTools):
         logger.info(f"DATA: {resp_data}")
 
         return resp_data
-        # return extractor.extract_cluster_info(data, keys_to_extract or default_keys)
-
-
-
-    # def get_cluster_info(self, keys_to_extract=None):
-    #     response = self._context.client.get(ApiEndpoints.Cluster.CLUSTER_INFO)
-    #     assert response.status_code == 200
-    #     data = response.json()
-    #     # print(f"DEBUG: cluster info: {data}")
-    #     # return TestExtractor().extract_cluster_info(data, keys_to_extract)
-    #
-    #     if keys_to_extract:
-    #         return TestExtractor().extract_cluster_info(data, keys_to_extract)
-    #     return data
 
 
     # def update_cluster_info(self):

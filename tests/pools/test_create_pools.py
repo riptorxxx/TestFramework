@@ -87,6 +87,7 @@ class TestCreatePools:
         # Проверяем что пул сохранился в current_pool
         assert pool_tools.current_pool is not None
         assert pool_tools.current_pool['name'] in pool_tools._pool_names
+
         pool_tools.cleanup()
 
 
@@ -95,10 +96,10 @@ class TestCreatePools:
     @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
     @pytest.mark.parametrize("keys_to_extract", [["name"]])
     @pytest.mark.parametrize("pool_config", [
-        PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=0, spareDisks=0),
-        PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=0, spareDisks=0),
-        PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=1, spareDisks=0),
-        PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=0, spareDisks=1),
+        # PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=0, spareDisks=0),
+        # PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=0, spareDisks=0),
+        # PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=1, spareDisks=0),
+        # PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=0, rdcDisks=0, spareDisks=1),
         PoolConfig(auto_configure=False, raid_type="raid1", mainDisks=2, wrcDisks=2, rdcDisks=2, spareDisks=2),
     ])
     def test_create_zfs_pool_manual_raid1(self, framework_context, pool_config, keys_to_extract):

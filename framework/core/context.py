@@ -8,7 +8,7 @@ class TestContext:
     def __init__(self, client, base_url, request=None):
         self.client = client
         self.base_url = base_url
-        self.request = request  # The request object provides access to pytest markers and other test metadata needed for retry
+        self.request = request
         self.tools_manager: ToolsManager = ToolsManager(self)
         '''Если вдруг нужно будет хранить контекст:'''
         # self.cluster_info = None
