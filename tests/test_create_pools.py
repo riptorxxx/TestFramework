@@ -15,9 +15,6 @@ class TestCreatePools:
         logger.info(response)
 
 
-
-
-
     @pytest.mark.nc
     @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
     @pytest.mark.parametrize("keys_to_extract", [["name"]])
@@ -93,6 +90,7 @@ class TestCreatePools:
         pool_tools.cleanup()
 
 
+    @pytest.mark.smoke
     @pytest.mark.nc
     @pytest.mark.parametrize("base_url", ["NODE_1"], indirect=True)
     @pytest.mark.parametrize("keys_to_extract", [["name"]])
@@ -114,6 +112,10 @@ class TestCreatePools:
         # Проверяем что пул сохранился в current_pool
         assert pool_tools.current_pool is not None
         assert pool_tools.current_pool['name'] in pool_tools._pool_names
+
+        response = pool_tools.get_pools().json()
+        logger.info(response)
+        pool_tools.expand_pool(pool_tools.current_pool['name'])
 
         pool_tools.cleanup()
 
